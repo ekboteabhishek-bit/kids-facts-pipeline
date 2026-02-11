@@ -649,10 +649,11 @@ def generate_image_for_shot(project_id, shot_id, custom_prompt=None):
 
 def generate_video_from_shot_image(project_id, shot_id):
     """
-    Generate video from an approved shot image using Kling image-to-video.
+    Generate video from an approved shot image using wan-2.2-i2v-fast on Replicate.
+    Uses simple motion prompts for consistent, subtle animations.
     """
-    if not FAL_API_AVAILABLE:
-        raise Exception("fal_api module not available")
+    if not REPLICATE_API_AVAILABLE:
+        raise Exception("replicate_api module not available")
 
     project = PROJECTS[project_id]
     shot = project['shots'][shot_id - 1]
@@ -661,13 +662,24 @@ def generate_video_from_shot_image(project_id, shot_id):
         raise Exception("Shot has no image URL")
 
     try:
-        shot['status'] = 'generating'
+        shot['video_status'] = 'generating'
+        save_projects()
 
-        # Generate video from image
-        result = fal_api.generate_video_from_image(
+        # Generate motion prompt (simple defaults)
+        motion_prompt = generate_motion_prompt(
+            shot.get('text', ''),
+            shot.get('full_prompt', '')
+        )
+        shot['motion_prompt'] = motion_prompt
+
+        print(f"Generating video for shot {shot_id} with motion: {motion_prompt}")
+
+        # Generate video using wan-2.2-i2v-fast on Replicate (720p, $0.11/video)
+        result = replicate_api.generate_video_from_image(
             shot['image_url'],
-            shot['full_prompt'],
-            duration="5"
+            motion_prompt,
+            resolution="720p",
+            num_frames=81
         )
 
         if result and result.get('url'):
@@ -681,22 +693,26 @@ def generate_video_from_shot_image(project_id, shot_id):
             with open(clip_path, 'wb') as f:
                 f.write(response.content)
 
-            shot['status'] = 'generated'
+            shot['video_status'] = 'generated'
+            shot['video_url'] = video_url
             shot['clip_path'] = str(clip_path)
+            save_projects()
 
             # Auto-trim to required duration
             trim_clip(project_id, shot_id)
 
             return True
         else:
-            shot['status'] = 'failed'
-            shot['error'] = 'No video URL in response'
+            shot['video_status'] = 'failed'
+            shot['video_error'] = 'No video URL in response'
+            save_projects()
             return False
 
     except Exception as e:
         print("Error generating video: " + str(e))
-        shot['status'] = 'failed'
-        shot['error'] = str(e)
+        shot['video_status'] = 'failed'
+        shot['video_error'] = str(e)
+        save_projects()
         return False
 
 
@@ -1114,6 +1130,63 @@ def detect_animation_type(phrase):
         }),
     ]
     return alternates[word_count % len(alternates)]
+
+
+def generate_motion_prompt(shot_text: str, image_prompt: str) -> str:
+    """
+    Generate a simple motion prompt for image-to-video conversion.
+    Uses simple default motions for consistent, subtle animations.
+    """
+    # Simple motion prompts that work well with most images
+    simple_motions = [
+        "subtle camera push in, gentle movement",
+        "slow zoom out revealing the scene, smooth motion",
+        "gentle pan from left to right, cinematic feel",
+        "soft dolly forward, slight parallax effect",
+        "subtle floating motion, dreamy atmosphere",
+        "slow Ken Burns zoom, professional documentary style",
+        "gentle camera drift, natural movement",
+        "smooth push in with slight rotation, dynamic feel"
+    ]
+
+    # Pick based on shot content hash for consistency
+    motion_index = hash(shot_text) % len(simple_motions)
+    base_motion = simple_motions[motion_index]
+
+    # Combine with the image context for better results
+    return f"{base_motion}, maintaining the scene composition"
+
+
+def generate_motion_prompt_llm(shot_text: str, image_prompt: str) -> str:
+    """
+    Use OpenAI to generate a contextual motion prompt (optional, more expensive).
+    Falls back to simple motion if OpenAI unavailable.
+    """
+    if not OPENAI_AVAILABLE:
+        return generate_motion_prompt(shot_text, image_prompt)
+
+    api_key = CONFIG.get('openai_api_key') or os.environ.get('OPENAI_API_KEY')
+    if not api_key:
+        return generate_motion_prompt(shot_text, image_prompt)
+
+    try:
+        client = OpenAI(api_key=api_key)
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{
+                "role": "system",
+                "content": "Generate a simple, subtle motion prompt for an image-to-video AI. Keep it brief (under 15 words). Focus on gentle camera movements like: slow zoom, gentle pan, subtle drift, soft push-in. Avoid dramatic or complex motions."
+            }, {
+                "role": "user",
+                "content": f"Image shows: {image_prompt[:200]}. Generate a subtle motion prompt."
+            }],
+            max_tokens=50,
+            temperature=0.7
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        print(f"Motion prompt LLM failed: {e}, using simple motion")
+        return generate_motion_prompt(shot_text, image_prompt)
 
 
 def generate_shots_with_llm(transcript_text, audio_duration, image_style=None):

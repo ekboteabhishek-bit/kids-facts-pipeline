@@ -10,7 +10,7 @@ from typing import Dict, Any
 
 REPLICATE_API_BASE = "https://api.replicate.com/v1"
 
-# Available models with costs (approximate per image)
+# Available models with costs (per image from Replicate pricing)
 MODELS = {
     "flux-schnell": {
         "id": "black-forest-labs/flux-schnell",
@@ -18,33 +18,38 @@ MODELS = {
         "cost": 0.003,
         "description": "Fast & cheap, good quality"
     },
-    "nano-banana": {
-        "id": "google/nano-banana",
-        "name": "Nano Banana",
-        "cost": 0.001,
-        "description": "Ultra fast, basic quality"
-    },
-    "seedream-4": {
-        "id": "bytedance/seedream-4",
-        "name": "Seedream 4",
-        "cost": 0.01,
-        "description": "High quality, photorealistic"
-    },
-    "seedream-4.5": {
-        "id": "bytedance/seedream-4.5",
-        "name": "Seedream 4.5",
-        "cost": 0.012,
-        "description": "Best quality, latest model"
-    },
     "flux-dev": {
         "id": "black-forest-labs/flux-dev",
         "name": "FLUX Dev",
         "cost": 0.025,
         "description": "Highest FLUX quality, slower"
+    },
+    "seedream-4": {
+        "id": "bytedance/seedream-4",
+        "name": "Seedream 4",
+        "cost": 0.03,
+        "description": "High quality, photorealistic"
+    },
+    "nano-banana": {
+        "id": "google/nano-banana",
+        "name": "Nano Banana",
+        "cost": 0.039,
+        "description": "Google Gemini, great quality"
+    },
+    "seedream-4.5": {
+        "id": "bytedance/seedream-4.5",
+        "name": "Seedream 4.5",
+        "cost": 0.04,
+        "description": "Best quality, latest model"
     }
 }
 
 DEFAULT_MODEL = "flux-schnell"
+
+# Image-to-Video model
+I2V_MODEL = "wan-video/wan-2.2-i2v-fast"
+I2V_COST_480P = 0.05
+I2V_COST_720P = 0.11
 
 # Legacy constants for compatibility
 NANO_BANANA_MODEL = "google/nano-banana"
@@ -255,3 +260,46 @@ def generate_image_flux(prompt: str, aspect_ratio: str = "9:16", model: str = No
             "height": height
         }
     return {}
+
+
+def generate_video_from_image(image_url: str, prompt: str, resolution: str = "720p", num_frames: int = 81) -> Dict[str, Any]:
+    """
+    Convert an image to video using wan-2.2-i2v-fast.
+
+    Args:
+        image_url: URL of the source image
+        prompt: Motion/action prompt for the video
+        resolution: "480p" ($0.05) or "720p" ($0.11)
+        num_frames: Number of frames (81 recommended, 81-121 range)
+
+    Returns:
+        dict with 'url' key for the generated video
+    """
+    input_data = {
+        "image": image_url,
+        "prompt": prompt,
+        "num_frames": num_frames,
+        "resolution": resolution,
+        "frames_per_second": 16,
+        "go_fast": True,
+        "sample_shift": 12
+    }
+
+    try:
+        prediction = create_prediction(I2V_MODEL, input_data)
+
+        if prediction.get("status") == "succeeded":
+            output = prediction.get("output")
+            if output:
+                return {"url": output if isinstance(output, str) else output[0]}
+            return {}
+
+        # Video generation takes longer, increase timeout
+        result = poll_until_complete(prediction["id"], timeout=300, interval=5)
+        output = result.get("output")
+        if output:
+            return {"url": output if isinstance(output, str) else output[0]}
+        return {}
+
+    except Exception as e:
+        raise Exception(f"Video generation failed: {str(e)}")
