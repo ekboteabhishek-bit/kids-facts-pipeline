@@ -791,12 +791,6 @@ def analyze_script(script_text, audio_duration=None, image_style=None):
             'clip_path': None,
             'trimmed_path': None,
             'error': None,
-            # Reference image
-            'reference_image': {
-                'type': 'none',  # none, uploaded, shot_reference
-                'source': None,
-                'image_url': None
-            },
             # Effects (will be populated by initialize_shot_effects)
             'effects': []
         })
@@ -1214,6 +1208,8 @@ def generate_shots_with_llm(transcript_text, audio_duration, image_style=None):
         max_duration = CONFIG['video']['clip_duration_range'][1]
         min_shots = int(audio_duration / max_duration) + 1
 
+        style_description = image_style if image_style else 'cinematic, high quality, dramatic lighting'
+
         system_prompt = f"""You are an expert at creating visual storyboards for short-form educational videos.
 
 Your task is to break a transcript into shots and generate specific image prompts for each shot.
@@ -1223,15 +1219,24 @@ RULES:
 2. Split sentences at natural meaning boundaries - a single sentence often needs 2-3 shots
 3. Generate SPECIFIC visual descriptions, not literal restatements of the text
 4. Think about what IMAGE would best represent the concept being discussed
-5. All prompts must be self-sufficient - they should make sense without knowing the transcript
-6. Maintain visual consistency across all shots (same style, similar composition approach)
-7. For this video, use this visual style: {image_style if image_style else 'cinematic, high quality, dramatic lighting'}
+
+CRITICAL - EACH PROMPT MUST BE COMPLETELY SELF-CONTAINED:
+- Each prompt will be sent to an image generation AI INDEPENDENTLY
+- The image AI has NO knowledge of previous prompts or the overall video
+- NEVER use phrases like "same style as before", "continuing from previous", "matching the earlier scene"
+- NEVER reference other shots (e.g., "similar to shot 1", "in the same environment")
+- Each prompt must include ALL necessary details: subject, setting, lighting, colors, camera angle, and style
+- A prompt should make complete sense if read in isolation
+
+STYLE TO INCLUDE IN EVERY PROMPT:
+{style_description}
 
 PROMPT WRITING GUIDELINES:
 - Describe the SCENE, not the words being spoken
 - Include specific visual details: lighting, camera angle, colors, composition
 - For abstract concepts, create concrete visual metaphors
 - Always specify "vertical 9:16 composition" for portrait format
+- Include the visual style in each prompt (e.g., "{style_description}")
 - End each prompt with "No text, no watermarks, no UI elements."
 
 OUTPUT FORMAT (JSON):
@@ -1254,8 +1259,9 @@ TRANSCRIPT:
 Remember:
 - Each shot = 3-6 words max
 - Prompts describe VISUALS, not text
-- Maintain consistency across all shots
-- Use the specified style throughout"""
+- Each prompt must be FULLY SELF-CONTAINED (no references to other prompts)
+- Include the style "{style_description}" in every single prompt
+- Include all details (subject, lighting, colors, camera angle) in each prompt"""
 
         response = client.chat.completions.create(
             model="gpt-5.2",
@@ -1329,11 +1335,6 @@ Remember:
                 'clip_path': None,
                 'trimmed_path': None,
                 'error': None,
-                'reference_image': {
-                    'type': 'none',
-                    'source': None,
-                    'image_url': None
-                },
                 'effects': []
             })
 
@@ -1478,12 +1479,6 @@ def smart_segment_transcript(transcript_text, audio_duration, image_style=None):
             'animated_clip_path': None,
             'status': 'pending',
             'error': None,
-            # Reference image
-            'reference_image': {
-                'type': 'none',
-                'source': None,
-                'image_url': None
-            },
             # Effects (populated by initialize_shot_effects)
             'effects': []
         })
@@ -2594,101 +2589,6 @@ def animate_all_shots(project_id):
     thread.start()
 
     return jsonify({'success': True, 'message': 'Animation generation started'})
-
-
-# ============== REFERENCE IMAGE ENDPOINTS ==============
-
-@app.route('/api/projects/<project_id>/shots/<int:shot_id>/reference', methods=['POST'])
-def set_shot_reference(project_id, shot_id):
-    """Set reference image for a shot."""
-    if project_id not in PROJECTS:
-        return jsonify({'error': 'Project not found'}), 404
-
-    shot = None
-    for s in PROJECTS[project_id]['shots']:
-        if s['id'] == shot_id:
-            shot = s
-            break
-
-    if not shot:
-        return jsonify({'error': 'Shot not found'}), 404
-
-    # Check if it's a file upload or shot reference
-    if 'image' in request.files:
-        # Upload reference image
-        image_file = request.files['image']
-        uploads_dir = Path(CONFIG['paths']['uploads']) / project_id
-        uploads_dir.mkdir(parents=True, exist_ok=True)
-
-        image_filename = "ref_shot_" + str(shot_id).zfill(2) + "_" + secure_filename(image_file.filename)
-        image_path = str(uploads_dir / image_filename)
-        image_file.save(image_path)
-
-        # Upload to Fal for use as reference
-        image_url = None
-        if FAL_API_AVAILABLE:
-            try:
-                image_url = fal_api.upload_image_to_fal(image_path)
-            except Exception as e:
-                print("Error uploading reference image: " + str(e))
-
-        shot['reference_image'] = {
-            'type': 'uploaded',
-            'source': image_path,
-            'image_url': image_url
-        }
-
-        return jsonify({
-            'success': True,
-            'reference': shot['reference_image']
-        })
-
-    else:
-        # Shot reference
-        data = request.get_json() or {}
-        source_shot_id = data.get('source_shot_id')
-
-        if not source_shot_id:
-            return jsonify({'error': 'No source_shot_id provided'}), 400
-
-        # Verify source shot exists and has an image
-        source_shot = None
-        for s in PROJECTS[project_id]['shots']:
-            if s['id'] == source_shot_id:
-                source_shot = s
-                break
-
-        if not source_shot:
-            return jsonify({'error': 'Source shot not found'}), 404
-
-        shot['reference_image'] = {
-            'type': 'shot_reference',
-            'source': 'shot_' + str(source_shot_id),
-            'image_url': source_shot.get('image_url')
-        }
-
-        return jsonify({
-            'success': True,
-            'reference': shot['reference_image']
-        })
-
-
-@app.route('/api/projects/<project_id>/shots/<int:shot_id>/reference', methods=['DELETE'])
-def remove_shot_reference(project_id, shot_id):
-    """Remove reference image from a shot."""
-    if project_id not in PROJECTS:
-        return jsonify({'error': 'Project not found'}), 404
-
-    for shot in PROJECTS[project_id]['shots']:
-        if shot['id'] == shot_id:
-            shot['reference_image'] = {
-                'type': 'none',
-                'source': None,
-                'image_url': None
-            }
-            return jsonify({'success': True})
-
-    return jsonify({'error': 'Shot not found'}), 404
 
 
 # ============== EFFECTS MANAGEMENT ENDPOINTS ==============

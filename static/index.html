@@ -1438,12 +1438,6 @@
                 card.className = 'shot-card';
                 card.id = `shot-${shot.id}`;
 
-                const refOptions = currentProject.shots
-                    .filter(s => s.id !== shot.id && (s.image_status === 'generated' || s.image_status === 'approved'))
-                    .map(s => `<option value="${s.id}" ${shot.reference_image?.source === 'shot_' + s.id ? 'selected' : ''}>Shot ${s.id}</option>`)
-                    .join('');
-
-                const currentRef = shot.reference_image?.type || 'none';
                 const animType = shot.animation_type || 'ken_burns_zoom_in';
                 const animLabel = ANIM_LABELS[animType] || animType;
 
@@ -1489,13 +1483,6 @@
                                 <label>Animation</label>
                                 <select class="form-select" onchange="updateAnimation(${shot.id}, this.value)">
                                     ${animOptions}
-                                </select>
-                            </div>
-                            <div>
-                                <label>Reference</label>
-                                <select class="form-select" onchange="setReference(${shot.id}, this.value)">
-                                    <option value="none" ${currentRef === 'none' ? 'selected' : ''}>None</option>
-                                    ${refOptions}
                                 </select>
                             </div>
                         </div>` : ''}
@@ -1708,22 +1695,6 @@
                 startPolling();
             } catch (error) {
                 showToast('Error regenerating image', 'error');
-            }
-        }
-
-        async function setReference(shotId, value) {
-            try {
-                if (value === 'none') {
-                    await fetch(`${API_BASE}/api/projects/${currentProject.id}/shots/${shotId}/reference`, { method: 'DELETE' });
-                } else {
-                    await fetch(`${API_BASE}/api/projects/${currentProject.id}/shots/${shotId}/reference`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ source_shot_id: parseInt(value) })
-                    });
-                }
-            } catch (error) {
-                showToast('Error setting reference', 'error');
             }
         }
 
