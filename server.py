@@ -167,46 +167,74 @@ def get_whisper_model():
     return WHISPER_MODEL
 
 
+def transcribe_audio_openai(audio_path, language="en"):
+    """
+    Transcribe audio using OpenAI's Whisper API (cloud-based).
+    Returns (full_text, confidence) tuple.
+    """
+    if not OPENAI_AVAILABLE:
+        raise Exception("OpenAI not available for cloud transcription")
+
+    api_key = CONFIG.get('openai_api_key') or os.environ.get('OPENAI_API_KEY')
+    if not api_key:
+        raise Exception("OpenAI API key not configured")
+
+    client = OpenAI(api_key=api_key)
+
+    print(f"Transcribing with OpenAI Whisper API...")
+    with open(audio_path, "rb") as audio_file:
+        result = client.audio.transcriptions.create(
+            model="whisper-1",
+            file=audio_file,
+            language=language.split('-')[0] if language else "en"
+        )
+
+    text = result.text.strip() if result.text else ""
+    confidence = 0.95  # OpenAI API doesn't return confidence, assume high
+
+    print(f"OpenAI transcription complete: {len(text)} chars")
+    return text, confidence
+
+
 def transcribe_audio_file(audio_path, chunk_duration=30, language="en-US"):
     """
-    Transcribe an audio file using local Whisper AI model.
+    Transcribe an audio file using Whisper (local or OpenAI API).
     Returns (full_text, average_confidence) tuple.
     """
-    if not WHISPER_AVAILABLE:
-        raise Exception("openai-whisper not installed. Install with: pip install openai-whisper")
-
-    # Whisper handles all common audio formats directly (mp3, m4a, wav, ogg, flac, etc.)
+    # Validate file format
     file_ext = audio_path.lower().split('.')[-1]
     if file_ext not in ['wav', 'mp3', 'm4a', 'ogg', 'flac', 'aac', 'wma', 'webm']:
         raise Exception("Unsupported audio format: " + file_ext)
 
-    model = get_whisper_model()
+    # Try local Whisper first, fall back to OpenAI API
+    if WHISPER_AVAILABLE:
+        model = get_whisper_model()
+        lang = language.split('-')[0] if language else "en"
 
-    # Extract language code (e.g., "en-US" -> "en")
-    lang = language.split('-')[0] if language else "en"
-
-    print(f"Transcribing with Whisper ({lang})...")
-    result = model.transcribe(
-        audio_path,
-        language=lang,
-        fp16=False  # Use fp32 for CPU compatibility
-    )
-
-    text = result.get('text', '').strip()
-
-    # Calculate average confidence from segments
-    segments = result.get('segments', [])
-    if segments:
-        avg_confidence = sum(
-            seg.get('no_speech_prob', 0) for seg in segments
+        print(f"Transcribing with local Whisper ({lang})...")
+        result = model.transcribe(
+            audio_path,
+            language=lang,
+            fp16=False
         )
-        # no_speech_prob is inverse of confidence, so convert
-        avg_confidence = 1.0 - (avg_confidence / len(segments))
-    else:
-        avg_confidence = 0.9 if text else 0.0
 
-    print(f"Whisper transcription complete: {len(text)} chars, confidence: {avg_confidence:.2f}")
-    return text, avg_confidence
+        text = result.get('text', '').strip()
+        segments = result.get('segments', [])
+        if segments:
+            avg_confidence = sum(seg.get('no_speech_prob', 0) for seg in segments)
+            avg_confidence = 1.0 - (avg_confidence / len(segments))
+        else:
+            avg_confidence = 0.9 if text else 0.0
+
+        print(f"Local Whisper transcription complete: {len(text)} chars, confidence: {avg_confidence:.2f}")
+        return text, avg_confidence
+
+    elif OPENAI_AVAILABLE:
+        # Fall back to OpenAI Whisper API
+        return transcribe_audio_openai(audio_path, language)
+
+    else:
+        raise Exception("No transcription method available. Install openai-whisper or configure OpenAI API key.")
 
 
 def run_transcription(transcription_id, audio_path):
@@ -2189,8 +2217,8 @@ def preview_clip(project_id, shot_id):
 @app.route('/api/transcribe', methods=['POST'])
 def start_transcription():
     """Upload audio and start transcription."""
-    if not WHISPER_AVAILABLE:
-        return jsonify({'error': 'openai-whisper not installed'}), 500
+    if not WHISPER_AVAILABLE and not OPENAI_AVAILABLE:
+        return jsonify({'error': 'No transcription method available. Configure OpenAI API key.'}), 500
 
     if 'audio' not in request.files:
         return jsonify({'error': 'No audio file provided'}), 400
