@@ -286,6 +286,12 @@ def transcribe_audio_file(audio_path, chunk_duration=30, language="en-US"):
     Transcribe an audio file using Whisper (OpenAI API preferred, local as fallback).
     Returns (full_text, average_confidence) tuple.
     """
+    # Debug logging
+    print(f"[TRANSCRIPTION DEBUG] OPENAI_AVAILABLE: {OPENAI_AVAILABLE}")
+    print(f"[TRANSCRIPTION DEBUG] WHISPER_AVAILABLE: {WHISPER_AVAILABLE}")
+    api_key = CONFIG.get('openai_api_key') or os.environ.get('OPENAI_API_KEY')
+    print(f"[TRANSCRIPTION DEBUG] API key configured: {bool(api_key)}")
+
     # Validate file format
     file_ext = audio_path.lower().split('.')[-1]
     if file_ext not in ['wav', 'mp3', 'm4a', 'ogg', 'flac', 'aac', 'wma', 'webm']:
@@ -293,12 +299,15 @@ def transcribe_audio_file(audio_path, chunk_duration=30, language="en-US"):
 
     # Try OpenAI Whisper API first (much faster), fall back to local Whisper
     if OPENAI_AVAILABLE:
-        api_key = CONFIG.get('openai_api_key') or os.environ.get('OPENAI_API_KEY')
         if api_key:
+            print("[TRANSCRIPTION] Using OpenAI Whisper API (cloud)")
             return transcribe_audio_openai(audio_path, language)
+        else:
+            print("[TRANSCRIPTION] OpenAI available but no API key configured")
 
     # Fall back to local Whisper
     if WHISPER_AVAILABLE:
+        print("[TRANSCRIPTION] Falling back to LOCAL Whisper (slow!)")
         model = get_whisper_model()
         lang = language.split('-')[0] if language else "en"
 
