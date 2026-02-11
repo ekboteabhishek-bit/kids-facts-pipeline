@@ -1134,40 +1134,15 @@ def detect_animation_type(phrase):
 
 def generate_motion_prompt(shot_text: str, image_prompt: str) -> str:
     """
-    Generate a simple motion prompt for image-to-video conversion.
-    Uses simple default motions for consistent, subtle animations.
-    """
-    # Simple motion prompts that work well with most images
-    simple_motions = [
-        "subtle camera push in, gentle movement",
-        "slow zoom out revealing the scene, smooth motion",
-        "gentle pan from left to right, cinematic feel",
-        "soft dolly forward, slight parallax effect",
-        "subtle floating motion, dreamy atmosphere",
-        "slow Ken Burns zoom, professional documentary style",
-        "gentle camera drift, natural movement",
-        "smooth push in with slight rotation, dynamic feel"
-    ]
-
-    # Pick based on shot content hash for consistency
-    motion_index = hash(shot_text) % len(simple_motions)
-    base_motion = simple_motions[motion_index]
-
-    # Combine with the image context for better results
-    return f"{base_motion}, maintaining the scene composition"
-
-
-def generate_motion_prompt_llm(shot_text: str, image_prompt: str) -> str:
-    """
-    Use OpenAI to generate a contextual motion prompt (optional, more expensive).
-    Falls back to simple motion if OpenAI unavailable.
+    Generate a contextual motion prompt by analyzing the image content.
+    Uses OpenAI to understand the scene and create appropriate camera movement.
     """
     if not OPENAI_AVAILABLE:
-        return generate_motion_prompt(shot_text, image_prompt)
+        return _simple_motion_fallback(shot_text)
 
     api_key = CONFIG.get('openai_api_key') or os.environ.get('OPENAI_API_KEY')
     if not api_key:
-        return generate_motion_prompt(shot_text, image_prompt)
+        return _simple_motion_fallback(shot_text)
 
     try:
         client = OpenAI(api_key=api_key)
@@ -1175,18 +1150,47 @@ def generate_motion_prompt_llm(shot_text: str, image_prompt: str) -> str:
             model="gpt-4o-mini",
             messages=[{
                 "role": "system",
-                "content": "Generate a simple, subtle motion prompt for an image-to-video AI. Keep it brief (under 15 words). Focus on gentle camera movements like: slow zoom, gentle pan, subtle drift, soft push-in. Avoid dramatic or complex motions."
+                "content": """You are a cinematographer creating motion prompts for image-to-video AI.
+
+Analyze the image description and create a motion prompt that:
+1. Matches the content (zoom into faces, pan across landscapes, follow action)
+2. Enhances the storytelling of the narration
+3. Uses cinematic camera movements appropriate for the scene
+
+Motion types to use:
+- PEOPLE/FACES: "slow push in towards the subject's face, intimate close-up feel"
+- LANDSCAPES/WIDE SHOTS: "slow pan across the scene revealing details, epic scope"
+- ACTION/MOVEMENT: "dynamic camera follow, energetic tracking shot"
+- OBJECTS/PRODUCTS: "smooth orbit around the subject, showcase rotation"
+- EMOTIONAL MOMENTS: "gentle drift with subtle zoom, contemplative mood"
+- DRAMATIC REVEALS: "slow zoom out revealing the full scene, dramatic unveil"
+
+Output ONLY the motion prompt (15-25 words), no explanations."""
             }, {
                 "role": "user",
-                "content": f"Image shows: {image_prompt[:200]}. Generate a subtle motion prompt."
+                "content": f"IMAGE DESCRIPTION: {image_prompt}\n\nNARRATION: {shot_text}\n\nGenerate the perfect camera motion for this shot:"
             }],
-            max_tokens=50,
+            max_tokens=60,
             temperature=0.7
         )
-        return response.choices[0].message.content.strip()
+        motion = response.choices[0].message.content.strip()
+        print(f"Generated motion prompt: {motion}")
+        return motion
     except Exception as e:
-        print(f"Motion prompt LLM failed: {e}, using simple motion")
-        return generate_motion_prompt(shot_text, image_prompt)
+        print(f"Motion prompt generation failed: {e}, using fallback")
+        return _simple_motion_fallback(shot_text)
+
+
+def _simple_motion_fallback(shot_text: str) -> str:
+    """Fallback simple motion prompts when OpenAI is unavailable."""
+    simple_motions = [
+        "slow cinematic push in, professional documentary feel",
+        "gentle zoom out revealing the full scene",
+        "smooth pan from left to right, natural movement",
+        "subtle camera drift with soft parallax",
+        "slow Ken Burns effect, elegant and timeless"
+    ]
+    return simple_motions[hash(shot_text) % len(simple_motions)]
 
 
 def generate_shots_with_llm(transcript_text, audio_duration, image_style=None):
