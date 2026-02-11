@@ -829,6 +829,16 @@
                             <label>Custom Style Description</label>
                             <input type="text" class="form-input" id="image-style-custom" placeholder="e.g., Studio Ghibli watercolor...">
                         </div>
+                        <div class="form-group">
+                            <label>AI Model <span id="model-cost" style="font-size: 0.75rem; color: var(--text-muted);"></span></label>
+                            <select class="form-select" id="image-model-select">
+                                <option value="flux-schnell" data-cost="0.003">FLUX Schnell - ~$0.003/img (Fast & cheap)</option>
+                                <option value="nano-banana" data-cost="0.001">Nano Banana - ~$0.001/img (Ultra fast)</option>
+                                <option value="seedream-4" data-cost="0.01">Seedream 4 - ~$0.01/img (High quality)</option>
+                                <option value="seedream-4.5" data-cost="0.012">Seedream 4.5 - ~$0.012/img (Best quality)</option>
+                                <option value="flux-dev" data-cost="0.025">FLUX Dev - ~$0.025/img (Premium)</option>
+                            </select>
+                        </div>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
                             <div class="form-group">
                                 <label>Platform</label>
@@ -1344,6 +1354,7 @@
             const platform = document.getElementById('platform-select').value;
             const imageStylePreset = document.getElementById('image-style-preset').value;
             const imageStyleCustom = document.getElementById('image-style-custom').value;
+            const imageModel = document.getElementById('image-model-select').value;
 
             if (!hook || !audio) {
                 showToast('Please upload hook video and audio file', 'error');
@@ -1357,6 +1368,7 @@
             formData.append('platform', platform);
             formData.append('image_style_preset', imageStylePreset);
             formData.append('image_style_custom', imageStyleCustom);
+            formData.append('image_model', imageModel);
 
             const btn = document.getElementById('create-project-btn');
             btn.disabled = true;

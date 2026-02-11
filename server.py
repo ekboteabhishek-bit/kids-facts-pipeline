@@ -613,8 +613,11 @@ def generate_image_for_shot(project_id, shot_id, custom_prompt=None):
         else:
             prompt = base_prompt
 
-        # Generate image using nano-banana on Replicate (faster, cheaper)
-        result = replicate_api.generate_image_flux(prompt, aspect_ratio="9:16", model="nano-banana")
+        # Get model from project (default: flux-schnell)
+        image_model = project.get('image_model', 'flux-schnell')
+
+        # Generate image using selected model on Replicate
+        result = replicate_api.generate_image_flux(prompt, aspect_ratio="9:16", model=image_model)
 
         if result and result.get('url'):
             image_url = result['url']
@@ -2016,6 +2019,9 @@ def create_project():
     image_style_preset = data.get('image_style_preset', CONFIG.get('image_styles', {}).get('default', 'pixar_3d'))
     image_style_custom = data.get('image_style_custom', '')
 
+    # Get image model (default to flux-schnell)
+    image_model = data.get('image_model', 'flux-schnell')
+
     # Resolve style: custom overrides preset
     if image_style_custom.strip():
         image_style = image_style_custom.strip()
@@ -2037,6 +2043,7 @@ def create_project():
         'platform': data.get('platform', 'tiktok'),
         'image_style': image_style,
         'image_style_preset': image_style_preset,
+        'image_model': image_model,
         'final_video': None,
         'transcription': {
             'status': 'processing',
@@ -3019,14 +3026,37 @@ def build_post_caption(transcript, platform='instagram'):
 @app.route('/api/config', methods=['GET'])
 def get_config():
     """Get current configuration (without API keys)."""
+    # Get available models from replicate_api
+    models = []
+    if REPLICATE_API_AVAILABLE:
+        try:
+            models = replicate_api.get_available_models()
+        except:
+            pass
+
     safe_config = {
         'platforms': CONFIG['platforms'],
         'sfx': {'enabled': CONFIG['sfx'].get('enabled', True), 'triggers': list(CONFIG['sfx'].get('triggers', CONFIG['sfx']).keys())},
         'video': CONFIG['video'],
         'effects': CONFIG.get('effects', {}),
-        'animation': CONFIG.get('animation', {})
+        'animation': CONFIG.get('animation', {}),
+        'image_models': models,
+        'default_image_model': replicate_api.DEFAULT_MODEL if REPLICATE_API_AVAILABLE else 'flux-schnell'
     }
     return jsonify(safe_config)
+
+
+@app.route('/api/models', methods=['GET'])
+def get_models():
+    """Get available image generation models."""
+    if not REPLICATE_API_AVAILABLE:
+        return jsonify({'error': 'Replicate API not available'}), 500
+
+    models = replicate_api.get_available_models()
+    return jsonify({
+        'models': models,
+        'default': replicate_api.DEFAULT_MODEL
+    })
 
 
 @app.route('/api/config/platform', methods=['POST'])

@@ -10,10 +10,54 @@ from typing import Dict, Any
 
 REPLICATE_API_BASE = "https://api.replicate.com/v1"
 
-# Available models
+# Available models with costs (approximate per image)
+MODELS = {
+    "flux-schnell": {
+        "id": "black-forest-labs/flux-schnell",
+        "name": "FLUX Schnell",
+        "cost": 0.003,
+        "description": "Fast & cheap, good quality"
+    },
+    "nano-banana": {
+        "id": "google/nano-banana",
+        "name": "Nano Banana",
+        "cost": 0.001,
+        "description": "Ultra fast, basic quality"
+    },
+    "seedream-4": {
+        "id": "bytedance/seedream-4",
+        "name": "Seedream 4",
+        "cost": 0.01,
+        "description": "High quality, photorealistic"
+    },
+    "seedream-4.5": {
+        "id": "bytedance/seedream-4.5",
+        "name": "Seedream 4.5",
+        "cost": 0.012,
+        "description": "Best quality, latest model"
+    },
+    "flux-dev": {
+        "id": "black-forest-labs/flux-dev",
+        "name": "FLUX Dev",
+        "cost": 0.025,
+        "description": "Highest FLUX quality, slower"
+    }
+}
+
+DEFAULT_MODEL = "flux-schnell"
+
+# Legacy constants for compatibility
 NANO_BANANA_MODEL = "google/nano-banana"
 FLUX_SCHNELL_MODEL = "black-forest-labs/flux-schnell"
 FLUX_DEV_MODEL = "black-forest-labs/flux-dev"
+
+
+def get_available_models():
+    """Return list of available models with metadata."""
+    return [
+        {"key": key, **info}
+        for key, info in MODELS.items()
+    ]
 
 
 def get_replicate_key():
@@ -97,7 +141,7 @@ def poll_until_complete(prediction_id: str, timeout: int = 300, interval: int = 
     raise TimeoutError(f"Prediction {prediction_id} timed out after {timeout}s")
 
 
-def generate_image(prompt: str, aspect_ratio: str = "9:16", num_outputs: int = 1, model: str = "nano-banana") -> Dict[str, Any]:
+def generate_image(prompt: str, aspect_ratio: str = "9:16", num_outputs: int = 1, model: str = None) -> Dict[str, Any]:
     """
     Generate an image using Replicate.
 
@@ -105,20 +149,38 @@ def generate_image(prompt: str, aspect_ratio: str = "9:16", num_outputs: int = 1
         prompt: Text prompt for image generation
         aspect_ratio: Aspect ratio (e.g., "9:16" for vertical, "16:9" for horizontal, "1:1" for square)
         num_outputs: Number of images to generate (1-4)
-        model: Model to use - "nano-banana" (default), "schnell" (fast FLUX), or "dev" (high quality FLUX)
+        model: Model key from MODELS dict (default: flux-schnell)
 
     Returns:
         dict with 'url' key for the generated image
     """
+    if model is None:
+        model = DEFAULT_MODEL
+
+    # Handle legacy model names
+    if model == "schnell":
+        model = "flux-schnell"
+    elif model == "dev":
+        model = "flux-dev"
+
+    # Get model config
+    model_config = MODELS.get(model, MODELS[DEFAULT_MODEL])
+    model_version = model_config["id"]
+
+    # Build input based on model type
     if model == "nano-banana":
-        model_version = NANO_BANANA_MODEL
         input_data = {
             "prompt": prompt,
             "aspect_ratio": aspect_ratio,
             "output_format": "png",
         }
-    elif model == "schnell":
-        model_version = FLUX_SCHNELL_MODEL
+    elif model in ["seedream-4", "seedream-4.5"]:
+        input_data = {
+            "prompt": prompt,
+            "aspect_ratio": aspect_ratio,
+            "num_outputs": num_outputs,
+        }
+    elif model == "flux-schnell":
         input_data = {
             "prompt": prompt,
             "aspect_ratio": aspect_ratio,
@@ -126,8 +188,7 @@ def generate_image(prompt: str, aspect_ratio: str = "9:16", num_outputs: int = 1
             "output_format": "png",
             "output_quality": 90,
         }
-    else:  # dev
-        model_version = FLUX_DEV_MODEL
+    else:  # flux-dev or unknown
         input_data = {
             "prompt": prompt,
             "aspect_ratio": aspect_ratio,
@@ -157,18 +218,20 @@ def generate_image(prompt: str, aspect_ratio: str = "9:16", num_outputs: int = 1
         raise Exception(f"Image generation failed: {str(e)}")
 
 
-def generate_image_flux(prompt: str, aspect_ratio: str = "9:16", model: str = "nano-banana") -> Dict[str, Any]:
+def generate_image_flux(prompt: str, aspect_ratio: str = "9:16", model: str = None) -> Dict[str, Any]:
     """
     Generate an image using Replicate.
 
     Args:
         prompt: Text prompt (detailed prompts work best)
         aspect_ratio: e.g., "9:16" for vertical shorts
-        model: "nano-banana" (default), "schnell" (fast FLUX), or "dev" (high quality FLUX)
+        model: Model key (default: flux-schnell)
 
     Returns:
         dict with 'url', 'width', 'height' keys
     """
+    if model is None:
+        model = DEFAULT_MODEL
     result = generate_image(prompt, aspect_ratio, 1, model)
 
     # Parse dimensions from aspect ratio
