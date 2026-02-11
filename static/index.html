@@ -1,0 +1,2271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kids Facts Pipeline</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg-dark: #09090b;
+            --bg-card: #18181b;
+            --bg-elevated: #27272a;
+            --border: #3f3f46;
+            --border-subtle: #27272a;
+            --text-primary: #fafafa;
+            --text-secondary: #a1a1aa;
+            --text-muted: #71717a;
+            --accent: #8b5cf6;
+            --accent-hover: #a78bfa;
+            --accent-subtle: rgba(139, 92, 246, 0.12);
+            --blue: #6366f1;
+            --blue-subtle: rgba(99, 102, 241, 0.12);
+            --success: #22c55e;
+            --success-subtle: rgba(34, 197, 94, 0.12);
+            --warning: #f59e0b;
+            --warning-subtle: rgba(245, 158, 11, 0.12);
+            --error: #ef4444;
+            --error-subtle: rgba(239, 68, 68, 0.12);
+            --gradient-1: linear-gradient(135deg, #8b5cf6 0%, #6366f1 50%, #06b6d4 100%);
+            --gradient-2: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
+            --glow: 0 0 20px rgba(139, 92, 246, 0.15);
+            --radius: 12px;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Header */
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.875rem 1.5rem;
+            border-bottom: 1px solid var(--border-subtle);
+            background: rgba(24, 24, 27, 0.8);
+            backdrop-filter: blur(12px);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.625rem;
+        }
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            background: var(--gradient-1);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.875rem;
+            font-weight: 700;
+            color: white;
+        }
+
+        .logo h1 {
+            font-size: 0.9375rem;
+            font-weight: 700;
+            letter-spacing: -0.03em;
+        }
+
+        .logo h1 span { color: var(--accent); }
+
+        .steps {
+            display: flex;
+            gap: 0.25rem;
+            background: var(--bg-elevated);
+            padding: 0.25rem;
+            border-radius: 10px;
+        }
+
+        .step {
+            padding: 0.375rem 0.875rem;
+            border-radius: 8px;
+            font-size: 0.8125rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .step.active {
+            color: var(--text-primary);
+            background: var(--bg-card);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+
+        .step.completed { color: var(--success); }
+        .step:hover:not(.active) { color: var(--text-secondary); }
+
+        /* Main */
+        main {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 1.5rem;
+        }
+
+        .panel { display: none; }
+        .panel.active { display: block; }
+
+        /* Buttons */
+        .btn {
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+            border: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.375rem;
+            white-space: nowrap;
+        }
+
+        .btn-primary {
+            background: var(--gradient-1);
+            color: white;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.2), 0 0 12px rgba(139,92,246,0.15);
+        }
+        .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.3), var(--glow); }
+
+        .btn-secondary {
+            background: var(--bg-elevated);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+        .btn-secondary:hover { background: var(--bg-card); border-color: var(--text-muted); }
+
+        .btn-success { background: var(--success); color: var(--bg-dark); }
+        .btn-danger { background: var(--error); color: white; }
+        .btn-sm { padding: 0.375rem 0.625rem; font-size: 0.75rem; }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
+
+        .actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.75rem;
+            margin-top: 1.5rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border-subtle);
+        }
+
+        /* Form */
+        .form-group { display: flex; flex-direction: column; gap: 0.375rem; }
+
+        .form-group label {
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .form-input, .form-select {
+            padding: 0.5rem 0.75rem;
+            background: var(--bg-dark);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.8125rem;
+        }
+        .form-input:focus, .form-select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-subtle); }
+
+        /* ========== UPLOAD PANEL ========== */
+        .upload-hero {
+            text-align: center;
+            padding: 1.25rem 0 1rem;
+        }
+        .upload-hero h2 {
+            font-size: 1.75rem;
+            font-weight: 800;
+            letter-spacing: -0.04em;
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .upload-hero p {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+            margin-top: 0.25rem;
+        }
+
+        .upload-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .upload-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius);
+            padding: 1rem;
+            transition: border-color 0.15s;
+        }
+        .upload-card:hover { border-color: var(--border); }
+
+        .upload-card-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.625rem;
+            display: flex;
+            align-items: center;
+            gap: 0.375rem;
+        }
+
+        .upload-card-label .required {
+            font-size: 0.625rem;
+            padding: 0.125rem 0.375rem;
+            background: var(--accent-subtle);
+            color: var(--accent);
+            border-radius: 4px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        .drop-zone {
+            border: 1.5px dashed var(--border);
+            border-radius: 10px;
+            padding: 1.25rem 1rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.15s;
+            background: var(--bg-dark);
+        }
+        .drop-zone:hover, .drop-zone.drag-over {
+            border-color: var(--accent);
+            background: var(--accent-subtle);
+        }
+        .drop-zone.has-file {
+            border-color: var(--success);
+            border-style: solid;
+            background: var(--success-subtle);
+        }
+
+        .drop-zone-icon {
+            font-size: 1.25rem;
+            margin-bottom: 0.25rem;
+            color: var(--text-muted);
+        }
+        .drop-zone-text {
+            color: var(--text-muted);
+            font-size: 0.8125rem;
+        }
+        .drop-zone-text strong { color: var(--accent); }
+        .drop-zone-hint {
+            font-size: 0.6875rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+
+        .file-name {
+            margin-top: 0.5rem;
+            padding: 0.375rem 0.625rem;
+            background: var(--bg-elevated);
+            border-radius: 6px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--success);
+        }
+
+        .upload-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .create-btn-wrapper {
+            margin-top: auto;
+            padding-top: 0.5rem;
+        }
+        .create-btn-wrapper .btn {
+            width: 100%;
+            justify-content: center;
+            padding: 0.625rem;
+            font-size: 0.875rem;
+        }
+
+        /* Processing overlay */
+        .processing-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(9, 9, 11, 0.92);
+            backdrop-filter: blur(8px);
+            z-index: 200;
+            align-items: center;
+            justify-content: center;
+        }
+        .processing-overlay.active { display: flex; }
+
+        .processing-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 2.5rem 3rem;
+            text-align: center;
+            max-width: 420px;
+            width: 100%;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5), var(--glow);
+        }
+
+        .processing-card h3 {
+            font-size: 1.125rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            letter-spacing: -0.02em;
+        }
+
+        .processing-steps {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            text-align: left;
+        }
+
+        .processing-step {
+            display: flex;
+            align-items: center;
+            gap: 0.625rem;
+            font-size: 0.8125rem;
+            color: var(--text-muted);
+            transition: color 0.2s;
+        }
+        .processing-step.active { color: var(--text-primary); }
+        .processing-step.done { color: var(--success); }
+
+        .processing-step-icon {
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .processing-progress {
+            margin-top: 1.25rem;
+            height: 3px;
+            background: var(--bg-elevated);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        .processing-progress-fill {
+            height: 100%;
+            background: var(--gradient-1);
+            border-radius: 2px;
+            transition: width 0.5s ease;
+            width: 0%;
+        }
+
+        /* ========== REVIEW PANEL ========== */
+        .review-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+        .review-header h2 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            letter-spacing: -0.03em;
+        }
+        .review-header p {
+            color: var(--text-muted);
+            font-size: 0.8125rem;
+        }
+        .review-actions { display: flex; gap: 0.5rem; }
+
+        .stats-row {
+            display: flex;
+            gap: 1.5rem;
+            margin: 1rem 0;
+            padding: 0.75rem 1rem;
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            border: 1px solid var(--border-subtle);
+        }
+
+        .stat { display: flex; align-items: center; gap: 0.5rem; }
+        .stat-value { font-size: 1.125rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+        .stat-label { font-size: 0.75rem; color: var(--text-muted); }
+
+        .progress-bar {
+            height: 3px;
+            background: var(--bg-elevated);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-bottom: 1rem;
+        }
+        .progress-fill {
+            height: 100%;
+            background: var(--gradient-1);
+            transition: width 0.3s ease;
+        }
+
+        /* Shot Cards */
+        .shots-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 0.625rem;
+        }
+
+        .shot-card {
+            display: grid;
+            grid-template-columns: 120px 1fr auto;
+            gap: 1rem;
+            padding: 0.875rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius);
+            align-items: start;
+            transition: border-color 0.15s;
+        }
+        .shot-card:hover { border-color: var(--border); }
+
+        .shot-preview {
+            width: 120px;
+            height: 160px;
+            background: var(--bg-dark);
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+        }
+        .shot-preview img, .shot-preview video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .shot-preview-placeholder {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+        }
+
+        .shot-info { display: flex; flex-direction: column; gap: 0.5rem; }
+
+        .shot-meta {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .shot-badge {
+            font-size: 0.6875rem;
+            font-weight: 600;
+            padding: 0.1875rem 0.5rem;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+        .shot-badge.number { background: var(--bg-elevated); color: var(--text-secondary); }
+        .shot-badge.duration { background: var(--blue-subtle); color: #818cf8; font-family: 'JetBrains Mono', monospace; }
+        .shot-badge.pending { background: var(--bg-elevated); color: var(--text-muted); }
+        .shot-badge.generating { background: var(--warning-subtle); color: var(--warning); }
+        .shot-badge.generated { background: var(--accent-subtle); color: var(--accent); }
+        .shot-badge.approved { background: var(--success-subtle); color: var(--success); }
+        .shot-badge.rejected { background: var(--error-subtle); color: var(--error); }
+        .shot-badge.failed { background: var(--error-subtle); color: var(--error); }
+        .shot-badge.animating { background: var(--warning-subtle); color: var(--warning); }
+        .shot-badge.animation { background: var(--accent-subtle); color: var(--accent); font-size: 0.625rem; }
+
+        .shot-phrase {
+            font-size: 0.8125rem;
+            color: var(--text-primary);
+            line-height: 1.4;
+        }
+
+        .shot-prompt {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+            padding: 0.5rem 0.625rem;
+            background: var(--bg-dark);
+            border-radius: 6px;
+            max-height: 52px;
+            overflow-y: auto;
+            line-height: 1.4;
+        }
+        .shot-prompt::-webkit-scrollbar { width: 3px; }
+        .shot-prompt::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+        .shot-controls {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+        .shot-controls .form-select {
+            padding: 0.3125rem 0.5rem;
+            font-size: 0.6875rem;
+        }
+        .shot-controls label {
+            font-size: 0.6875rem;
+            color: var(--text-muted);
+            margin-bottom: 0.125rem;
+        }
+
+        .shot-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 0.375rem;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(9, 9, 11, 0.85);
+            backdrop-filter: blur(4px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .modal-overlay.active { display: flex; }
+
+        .modal {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            width: 100%;
+            max-width: 540px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .modal h3 { font-size: 1rem; font-weight: 700; margin-bottom: 0.875rem; }
+        .modal textarea {
+            width: 100%;
+            min-height: 120px;
+            background: var(--bg-dark);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            padding: 0.75rem;
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8125rem;
+            resize: vertical;
+        }
+        .modal textarea:focus { outline: none; border-color: var(--accent); }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.75rem; }
+
+        /* Assembly Panel */
+        .assembly-preview {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.25rem;
+            margin-top: 1rem;
+        }
+
+        .timeline-preview, .output-settings {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius);
+            padding: 1.25rem;
+        }
+        .timeline-preview h3, .output-settings h3 {
+            font-size: 0.875rem;
+            font-weight: 700;
+            margin-bottom: 0.75rem;
+        }
+
+        .timeline { display: flex; flex-direction: column; gap: 0.375rem; }
+
+        .timeline-item {
+            display: flex;
+            align-items: center;
+            gap: 0.625rem;
+            padding: 0.5rem 0.625rem;
+            background: var(--bg-dark);
+            border-radius: 8px;
+            font-size: 0.8125rem;
+        }
+        .timeline-item-type {
+            font-size: 0.625rem;
+            padding: 0.1875rem 0.375rem;
+            border-radius: 4px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .timeline-item-type.hook { background: var(--warning-subtle); color: var(--warning); }
+        .timeline-item-type.broll { background: var(--accent-subtle); color: var(--accent); }
+        .timeline-item-name { flex: 1; font-size: 0.8125rem; color: var(--text-secondary); }
+        .timeline-item-duration { font-size: 0.75rem; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+
+        .caption-preview {
+            width: 100%;
+            aspect-ratio: 9/16;
+            max-height: 320px;
+            background: var(--bg-dark);
+            border-radius: var(--radius);
+            position: relative;
+            overflow: hidden;
+            margin-top: 0.75rem;
+        }
+        .caption-sample {
+            position: absolute;
+            bottom: 20%;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            font-weight: 700;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+        }
+
+        .effects-editor {
+            margin-top: 1.25rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius);
+            padding: 1.25rem;
+        }
+        .effects-editor h3 { font-size: 0.875rem; font-weight: 700; }
+
+        .download-section {
+            text-align: center;
+            padding: 2rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 16px;
+            margin-top: 1.5rem;
+        }
+        .download-section h2 { font-size: 1.25rem; font-weight: 700; margin-bottom: 0.375rem; }
+        .download-section p { color: var(--text-muted); margin-bottom: 1rem; font-size: 0.875rem; }
+
+        /* Spinner */
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+            display: inline-block;
+        }
+        .spinner-lg { width: 24px; height: 24px; border-width: 2.5px; }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Toast */
+        .toast-container {
+            position: fixed;
+            bottom: 1.5rem;
+            right: 1.5rem;
+            z-index: 1001;
+            display: flex;
+            flex-direction: column;
+            gap: 0.375rem;
+        }
+        .toast {
+            padding: 0.625rem 1rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.8125rem;
+            animation: slideIn 0.2s ease;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        .toast.success { border-color: var(--success); }
+        .toast.error { border-color: var(--error); }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(100%); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .upload-row { grid-template-columns: 1fr; }
+            .shot-card { grid-template-columns: 1fr; }
+            .shot-preview { width: 100%; height: 180px; }
+            .assembly-preview { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo">
+            <div class="logo-icon">KF</div>
+            <h1>Kids <span>Facts</span></h1>
+        </div>
+        <nav class="steps">
+            <button class="step active" data-panel="upload">Upload</button>
+            <button class="step" data-panel="review">Review</button>
+            <button class="step" data-panel="assemble">Assemble</button>
+        </nav>
+    </header>
+
+    <!-- Processing Overlay -->
+    <div class="processing-overlay" id="processing-overlay">
+        <div class="processing-card">
+            <h3>Setting up your project</h3>
+            <div class="processing-steps">
+                <div class="processing-step active" id="proc-upload">
+                    <div class="processing-step-icon"><div class="spinner"></div></div>
+                    <span>Uploading files</span>
+                </div>
+                <div class="processing-step" id="proc-transcribe">
+                    <div class="processing-step-icon"><span style="color: var(--text-muted);">&#9675;</span></div>
+                    <span>Transcribing audio with Whisper AI</span>
+                </div>
+                <div class="processing-step" id="proc-segment">
+                    <div class="processing-step-icon"><span style="color: var(--text-muted);">&#9675;</span></div>
+                    <span>Segmenting into shots</span>
+                </div>
+            </div>
+            <div class="processing-progress">
+                <div class="processing-progress-fill" id="processing-progress-fill"></div>
+            </div>
+        </div>
+    </div>
+
+    <main>
+        <!-- UPLOAD PANEL -->
+        <section id="upload-panel" class="panel active">
+            <div class="upload-hero">
+                <h2>Create a new video</h2>
+                <p>Upload your hook video and voiceover audio. We handle the rest.</p>
+            </div>
+
+            <div class="upload-row">
+                <!-- Hook Video -->
+                <div class="upload-card">
+                    <div class="upload-card-label">
+                        Hook Video <span class="required">Required</span>
+                    </div>
+                    <div class="drop-zone" id="hook-drop" data-input="hook-input">
+                        <div class="drop-zone-icon">&#9654;</div>
+                        <div class="drop-zone-text">Drop <strong>hook video</strong> here</div>
+                        <div class="drop-zone-hint">or click to browse</div>
+                    </div>
+                    <input type="file" id="hook-input" accept="video/*" hidden>
+                </div>
+
+                <!-- Audio -->
+                <div class="upload-card">
+                    <div class="upload-card-label">
+                        Audio <span class="required">Required</span>
+                    </div>
+                    <div class="drop-zone" id="audio-drop" data-input="audio-input">
+                        <div class="drop-zone-icon">&#9835;</div>
+                        <div class="drop-zone-text">Drop <strong>voiceover audio</strong> here</div>
+                        <div class="drop-zone-hint">WAV, MP3, M4A</div>
+                    </div>
+                    <input type="file" id="audio-input" accept="audio/*" hidden>
+                </div>
+
+                <!-- Settings + Create -->
+                <div class="upload-card" style="grid-column: span 1;">
+                    <div class="upload-card-label">Settings</div>
+                    <div class="upload-meta">
+                        <div class="form-group">
+                            <label>Replicate API Key</label>
+                            <div style="display: flex; gap: 0.375rem;">
+                                <input type="password" class="form-input" id="replicate-api-key" placeholder="r8_..." style="flex: 1; font-size: 0.75rem;">
+                                <button class="btn btn-secondary btn-sm" id="save-replicate-key-btn" style="white-space: nowrap;">Save</button>
+                            </div>
+                            <span id="replicate-key-status" style="font-size: 0.6875rem; color: var(--text-muted);"></span>
+                        </div>
+                        <div class="form-group">
+                            <label>Image Style</label>
+                            <select class="form-select" id="image-style-preset">
+                                <option value="pixar_3d">Pixar 3D Animation</option>
+                                <option value="anime">Anime Style</option>
+                                <option value="realistic">Photorealistic</option>
+                                <option value="cartoon">Cartoon</option>
+                                <option value="watercolor">Watercolor</option>
+                                <option value="comic_book">Comic Book</option>
+                                <option value="claymation">Claymation</option>
+                                <option value="retro_80s">Retro 80s</option>
+                                <option value="fantasy">Fantasy Art</option>
+                                <option value="minimalist">Minimalist</option>
+                                <option value="custom">Custom Style...</option>
+                            </select>
+                        </div>
+                        <div class="form-group" id="custom-style-group" style="display: none;">
+                            <label>Custom Style Description</label>
+                            <input type="text" class="form-input" id="image-style-custom" placeholder="e.g., Studio Ghibli watercolor...">
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                            <div class="form-group">
+                                <label>Platform</label>
+                                <select class="form-select" id="platform-select">
+                                    <option value="tiktok">TikTok</option>
+                                    <option value="instagram">Instagram Reels</option>
+                                    <option value="youtube_shorts">YouTube Shorts</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Project Name</label>
+                                <input type="text" class="form-input" id="project-name" placeholder="e.g., popcorn_facts">
+                            </div>
+                        </div>
+                        <div class="create-btn-wrapper">
+                            <button class="btn btn-primary" id="create-project-btn">
+                                Create Project
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Previous Projects -->
+            <div style="margin-top: 1.5rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                    <h3 style="font-size: 1rem; font-weight: 700;">Previous Projects</h3>
+                    <button class="btn btn-secondary btn-sm" id="refresh-projects-btn">Refresh</button>
+                </div>
+                <div id="projects-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.75rem;"></div>
+            </div>
+        </section>
+
+        <!-- REVIEW PANEL -->
+        <section id="review-panel" class="panel">
+            <div class="review-header">
+                <div>
+                    <h2>Review shots</h2>
+                    <p>Generate images, approve, then animate into clips.</p>
+                </div>
+                <div class="review-actions">
+                    <button class="btn btn-secondary" id="generate-all-images-btn">Generate All Images</button>
+                    <button class="btn btn-success btn-sm" id="approve-all-images-btn" style="display: none;">Approve All Images</button>
+                    <button class="btn btn-primary" id="generate-videos-btn" disabled>Animate All</button>
+                    <button class="btn btn-success btn-sm" id="approve-all-animations-btn" style="display: none;">Approve All Animations</button>
+                </div>
+            </div>
+
+            <div class="stats-row">
+                <div class="stat">
+                    <span class="stat-value" id="stat-total">0</span>
+                    <span class="stat-label">Shots</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-value" style="color: var(--success);" id="stat-approved">0</span>
+                    <span class="stat-label">Approved</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-value" style="color: var(--text-muted);" id="stat-pending">0</span>
+                    <span class="stat-label">Pending</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-value" style="color: var(--error);" id="stat-rejected">0</span>
+                    <span class="stat-label">Rejected</span>
+                </div>
+            </div>
+
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress-fill" style="width: 0%;"></div>
+            </div>
+
+            <div class="shots-grid" id="shots-grid"></div>
+
+            <div class="actions">
+                <button class="btn btn-secondary" id="back-to-upload-btn">&larr; Back</button>
+                <button class="btn btn-primary" id="proceed-to-assemble-btn" disabled>Proceed to Assembly &rarr;</button>
+            </div>
+        </section>
+
+        <!-- ASSEMBLE PANEL -->
+        <section id="assemble-panel" class="panel">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h2 style="font-size: 1.25rem; font-weight: 700; letter-spacing: -0.03em;">Final Assembly</h2>
+                    <p style="color: var(--text-muted); font-size: 0.75rem;">Timeline, captions, effects &rarr; export.</p>
+                </div>
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <button class="btn btn-secondary btn-sm" id="back-to-review-btn">&larr; Review</button>
+                    <button class="btn btn-success" id="assemble-btn">Assemble Final Video</button>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem; margin-top: 0.75rem;">
+                <!-- Timeline -->
+                <div style="background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius); padding: 0.75rem;">
+                    <h3 style="font-size: 0.8125rem; font-weight: 700; margin-bottom: 0.5rem;">Timeline</h3>
+                    <div class="timeline" id="timeline" style="max-height: 240px; overflow-y: auto;"></div>
+                </div>
+
+                <!-- Captions & Output -->
+                <div style="background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius); padding: 0.75rem;">
+                    <h3 style="font-size: 0.8125rem; font-weight: 700; margin-bottom: 0.5rem;">Captions</h3>
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.8125rem; color: var(--text-primary); margin-bottom: 0.625rem;">
+                        <input type="checkbox" id="apply-effects" checked style="width: 14px; height: 14px; accent-color: var(--accent);">
+                        Remotion Effects
+                    </label>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.375rem;">
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label>Caption Style</label>
+                            <select class="form-select" id="caption-style" style="padding: 0.375rem; font-size: 0.75rem;">
+                                <option value="karaoke">Karaoke Highlight</option>
+                                <option value="word_by_word">Word-by-Word Pop</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Font</label>
+                            <select class="form-select" id="caption-font" style="padding: 0.375rem; font-size: 0.75rem;">
+                                <option value="Nunito-Bold">Nunito</option>
+                                <option value="Montserrat-Bold">Montserrat</option>
+                                <option value="Poppins-Bold">Poppins</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Size</label>
+                            <input type="number" class="form-input" id="caption-size" value="64" min="32" max="96" style="padding: 0.375rem; font-size: 0.75rem;">
+                        </div>
+                        <div class="form-group">
+                            <label>Bottom (px)</label>
+                            <input type="number" class="form-input" id="caption-bottom" value="180" min="50" max="400" style="padding: 0.375rem; font-size: 0.75rem;">
+                        </div>
+                        <div class="form-group">
+                            <label>Highlight</label>
+                            <input type="color" class="form-input" id="caption-highlight" value="#8b5cf6" style="height: 30px; padding: 0.125rem;">
+                        </div>
+                        <div class="form-group">
+                            <label>BG Pill</label>
+                            <select class="form-select" id="caption-bg" style="padding: 0.375rem; font-size: 0.75rem;">
+                                <option value="none">None</option>
+                                <option value="dark" selected>Dark</option>
+                                <option value="blur">Blur</option>
+                            </select>
+                        </div>
+                    </div>
+                    <!-- Karaoke preview -->
+                    <div style="margin-top: 0.5rem; padding: 0.75rem; background: var(--bg-dark); border-radius: 8px; text-align: center; min-height: 48px; display: flex; align-items: center; justify-content: center;">
+                        <div id="caption-sample" style="font-size: 16px; font-weight: 700; line-height: 1.4;">
+                            <span style="color: #8b5cf6; background: rgba(139,92,246,0.15); padding: 2px 4px; border-radius: 4px;">Did</span>
+                            <span style="color: #8b5cf6; background: rgba(139,92,246,0.15); padding: 2px 4px; border-radius: 4px;">you</span>
+                            <span style="color: var(--text-muted); padding: 2px 4px;">know</span>
+                            <span style="color: var(--text-muted); padding: 2px 4px;">this</span>
+                            <span style="color: var(--text-muted); padding: 2px 4px;">fact?</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Effects Editor (compact) -->
+                <div style="background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius); padding: 0.75rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                        <h3 style="font-size: 0.8125rem; font-weight: 700;">Effects</h3>
+                        <button class="btn btn-secondary btn-sm" id="reset-effects-btn" style="font-size: 0.625rem; padding: 0.25rem 0.5rem;">Reset</button>
+                    </div>
+                    <div id="effects-editor-content" style="max-height: 240px; overflow-y: auto;"></div>
+                </div>
+            </div>
+
+            <!-- Post Caption -->
+            <div style="background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius); padding: 1rem; margin-top: 0.75rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.625rem;">
+                    <h3 style="font-size: 0.8125rem; font-weight: 700;">Post Caption</h3>
+                    <div style="display: flex; gap: 0.375rem;">
+                        <button class="btn btn-secondary btn-sm" id="generate-caption-btn" style="font-size: 0.6875rem;">Generate</button>
+                        <button class="btn btn-secondary btn-sm" id="copy-caption-btn" style="font-size: 0.6875rem;">Copy</button>
+                    </div>
+                </div>
+                <textarea id="post-caption-text" style="width: 100%; min-height: 120px; background: var(--bg-dark); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 0.75rem; color: var(--text-primary); font-family: inherit; font-size: 0.8125rem; resize: vertical; line-height: 1.5;" placeholder="Click 'Generate' to create a post caption with hashtags, or type your own..."></textarea>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.375rem;">
+                    <span style="font-size: 0.6875rem; color: var(--text-muted);" id="caption-char-count">0 chars</span>
+                    <span style="font-size: 0.6875rem; color: var(--text-muted);">Edit freely before posting</span>
+                </div>
+            </div>
+
+            <div class="download-section" id="download-section" style="display: none; margin-top: 0.75rem; padding: 1.25rem;">
+                <h2 style="font-size: 1.125rem;">Video Complete</h2>
+                <p>Your video is ready for download.</p>
+                <div style="margin: 1rem auto; max-width: 300px;">
+                    <video id="final-video-preview" controls style="width: 100%; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.4);"></video>
+                </div>
+                <div style="display: flex; gap: 0.5rem; justify-content: center;">
+                    <button class="btn btn-primary" id="download-btn">Download Video</button>
+                    <button class="btn btn-secondary" onclick="document.getElementById('final-video-preview').requestFullscreen()">Fullscreen</button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Assembly Progress Overlay -->
+    <div class="processing-overlay" id="assembly-overlay">
+        <div class="processing-card" style="max-width: 500px;">
+            <h3>Assembling Video</h3>
+            <div class="processing-steps" id="assembly-steps">
+                <div class="processing-step" id="asm-concat">
+                    <div class="processing-step-icon"><span style="color: var(--text-muted);">&#9675;</span></div>
+                    <span>Concatenating video clips</span>
+                </div>
+                <div class="processing-step" id="asm-audio">
+                    <div class="processing-step-icon"><span style="color: var(--text-muted);">&#9675;</span></div>
+                    <span>Adding voiceover audio</span>
+                </div>
+                <div class="processing-step" id="asm-effects">
+                    <div class="processing-step-icon"><span style="color: var(--text-muted);">&#9675;</span></div>
+                    <span>Rendering Remotion effects</span>
+                </div>
+                <div class="processing-step" id="asm-final">
+                    <div class="processing-step-icon"><span style="color: var(--text-muted);">&#9675;</span></div>
+                    <span>Finalizing output</span>
+                </div>
+            </div>
+            <div class="processing-progress">
+                <div class="processing-progress-fill" id="assembly-progress-fill"></div>
+            </div>
+            <div id="assembly-details" style="margin-top: 1rem; font-size: 0.75rem; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; max-height: 120px; overflow-y: auto; text-align: left; padding: 0.5rem; background: var(--bg-dark); border-radius: 6px;"></div>
+        </div>
+    </div>
+
+    <!-- Error Details Modal -->
+    <div class="modal-overlay" id="error-modal">
+        <div class="modal" style="max-width: 600px;">
+            <h3 style="color: var(--error);">Error Details</h3>
+            <div id="error-modal-content" style="margin: 1rem 0; padding: 1rem; background: var(--bg-dark); border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 0.8125rem; max-height: 300px; overflow-y: auto; white-space: pre-wrap; word-break: break-word;"></div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeErrorModal()">Close</button>
+                <button class="btn btn-primary" onclick="copyError()">Copy Error</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Prompt Modal -->
+    <div class="modal-overlay" id="edit-modal">
+        <div class="modal">
+            <h3>Edit Prompt</h3>
+            <p style="color: var(--text-muted); margin-bottom: 0.75rem; font-size: 0.8125rem;">
+                Modify the image generation prompt and regenerate.
+            </p>
+            <textarea id="edit-prompt-textarea"></textarea>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="cancel-edit-btn">Cancel</button>
+                <button class="btn btn-primary" id="save-edit-btn">Save & Regenerate</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast-container" id="toast-container"></div>
+
+    <script>
+        let currentProject = null;
+        let currentEditShotId = null;
+        let pollInterval = null;
+
+        const API_BASE = '';
+
+        const panels = document.querySelectorAll('.panel');
+        const steps = document.querySelectorAll('.step');
+        const dropZones = document.querySelectorAll('.drop-zone');
+
+        // Animation type labels for display
+        const ANIM_LABELS = {
+            'ken_burns_zoom_in': 'Zoom In',
+            'ken_burns_zoom_out': 'Zoom Out',
+            'pan_left': 'Pan Left',
+            'pan_right': 'Pan Right',
+            'tilt_up': 'Tilt Up',
+            'tilt_down': 'Tilt Down',
+            'zoom_pulse': 'Impact Zoom',
+            'slow_drift': 'Slow Drift',
+            'dolly_push': 'Dolly Push',
+            'pull_back': 'Pull Back'
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            setupDropZones();
+            setupNavigation();
+            setupButtons();
+            setupModal();
+            setupCaptionPreview();
+            setupImageStyleSelector();
+            loadProjects();
+        });
+
+        // Image Style Selector
+        function setupImageStyleSelector() {
+            const presetSelect = document.getElementById('image-style-preset');
+            const customGroup = document.getElementById('custom-style-group');
+
+            presetSelect.addEventListener('change', () => {
+                if (presetSelect.value === 'custom') {
+                    customGroup.style.display = 'block';
+                } else {
+                    customGroup.style.display = 'none';
+                }
+            });
+        }
+
+        // Load Previous Projects
+        async function loadProjects() {
+            try {
+                const res = await fetch(`${API_BASE}/api/projects`);
+                const data = await res.json();
+                renderProjectsList(data.projects || []);
+            } catch (e) {
+                console.error('Failed to load projects:', e);
+            }
+        }
+
+        function renderProjectsList(projects) {
+            const container = document.getElementById('projects-list');
+            if (projects.length === 0) {
+                container.innerHTML = '<p style="color: var(--text-muted); font-size: 0.875rem;">No previous projects. Create your first one above!</p>';
+                return;
+            }
+
+            container.innerHTML = projects.map(p => `
+                <div class="upload-card" style="padding: 0.875rem; cursor: pointer;" onclick="loadProject('${p.id}')">
+                    <div style="display: flex; justify-content: space-between; align-items: start;">
+                        <div>
+                            <div style="font-weight: 600; font-size: 0.875rem;">${p.name}</div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">
+                                ${p.shots_count} shots &bull; ${p.platform}
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 0.25rem; align-items: center;">
+                            <span class="shot-badge ${p.status === 'complete' ? 'approved' : p.status === 'created' ? 'generated' : 'pending'}">${p.status}</span>
+                            ${p.has_final_video ? '<span class="shot-badge" style="background: var(--success-subtle); color: var(--success);">video</span>' : ''}
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 0.375rem; margin-top: 0.625rem;">
+                        <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); loadProject('${p.id}')" style="flex: 1;">Open</button>
+                        <button class="btn btn-sm" onclick="event.stopPropagation(); deleteProject('${p.id}')" style="background: var(--error-subtle); color: var(--error);">Delete</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function loadProject(projectId) {
+            try {
+                const res = await fetch(`${API_BASE}/api/projects/${projectId}`);
+                if (!res.ok) throw new Error('Project not found');
+                currentProject = await res.json();
+                renderShots();
+                showPanel('review');
+                showToast(`Loaded project: ${currentProject.name}`, 'success');
+            } catch (e) {
+                showToast('Failed to load project: ' + e.message, 'error');
+            }
+        }
+
+        async function deleteProject(projectId) {
+            if (!confirm('Delete this project? This cannot be undone.')) return;
+            try {
+                await fetch(`${API_BASE}/api/projects/${projectId}`, { method: 'DELETE' });
+                loadProjects();
+                showToast('Project deleted', 'success');
+            } catch (e) {
+                showToast('Failed to delete project', 'error');
+            }
+        }
+
+        // Drop Zones
+        function setupDropZones() {
+            dropZones.forEach(zone => {
+                const inputId = zone.dataset.input;
+                const input = document.getElementById(inputId);
+
+                zone.addEventListener('click', () => input.click());
+                zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.classList.add('drag-over'); });
+                zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+                zone.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    zone.classList.remove('drag-over');
+                    if (e.dataTransfer.files.length > 0) {
+                        input.files = e.dataTransfer.files;
+                        updateDropZone(zone, e.dataTransfer.files[0]);
+                    }
+                });
+                input.addEventListener('change', () => {
+                    if (input.files.length > 0) updateDropZone(zone, input.files[0]);
+                });
+            });
+        }
+
+        function updateDropZone(zone, file) {
+            zone.classList.add('has-file');
+            zone.innerHTML = `
+                <div class="drop-zone-icon" style="color: var(--success);">&#10003;</div>
+                <div class="file-name">${file.name}</div>
+                <div class="drop-zone-hint" style="margin-top: 0.375rem;">Click to change</div>
+            `;
+        }
+
+        // Navigation
+        function setupNavigation() {
+            steps.forEach(step => {
+                step.addEventListener('click', () => showPanel(step.dataset.panel));
+            });
+        }
+
+        function showPanel(panelId) {
+            panels.forEach(p => p.classList.remove('active'));
+            steps.forEach(s => s.classList.remove('active'));
+            document.getElementById(`${panelId}-panel`).classList.add('active');
+            document.querySelector(`[data-panel="${panelId}"]`).classList.add('active');
+        }
+
+        // Buttons
+        function setupButtons() {
+            document.getElementById('create-project-btn').addEventListener('click', createProject);
+            document.getElementById('generate-all-images-btn').addEventListener('click', generateAllImages);
+            document.getElementById('generate-videos-btn').addEventListener('click', generateVideosFromImages);
+            document.getElementById('back-to-upload-btn').addEventListener('click', () => showPanel('upload'));
+            document.getElementById('back-to-review-btn').addEventListener('click', () => showPanel('review'));
+            document.getElementById('proceed-to-assemble-btn').addEventListener('click', () => {
+                showPanel('assemble');
+                updateTimeline();
+                renderEffectsEditor();
+            });
+            document.getElementById('reset-effects-btn').addEventListener('click', resetEffects);
+            document.getElementById('assemble-btn').addEventListener('click', assembleVideo);
+            document.getElementById('download-btn').addEventListener('click', downloadVideo);
+            document.getElementById('save-replicate-key-btn').addEventListener('click', saveReplicateApiKey);
+            document.getElementById('generate-caption-btn').addEventListener('click', generatePostCaption);
+            document.getElementById('copy-caption-btn').addEventListener('click', copyPostCaption);
+            document.getElementById('post-caption-text').addEventListener('input', updateCaptionCharCount);
+            document.getElementById('approve-all-images-btn').addEventListener('click', approveAllImages);
+            document.getElementById('approve-all-animations-btn').addEventListener('click', approveAllAnimations);
+            document.getElementById('refresh-projects-btn').addEventListener('click', loadProjects);
+            checkReplicateKeyStatus();
+        }
+
+        // Replicate API Key
+        async function saveReplicateApiKey() {
+            const key = document.getElementById('replicate-api-key').value.trim();
+            if (!key) { showToast('Enter an API key', 'error'); return; }
+            try {
+                const res = await fetch(`${API_BASE}/api/config/replicate-key`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ key })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast('API key saved', 'success');
+                    document.getElementById('replicate-api-key').value = '';
+                    checkReplicateKeyStatus();
+                } else {
+                    showToast(data.error || 'Failed to save', 'error');
+                }
+            } catch (e) { showToast('Error saving key', 'error'); }
+        }
+
+        async function checkReplicateKeyStatus() {
+            try {
+                const res = await fetch(`${API_BASE}/api/config/replicate-key`);
+                const data = await res.json();
+                const el = document.getElementById('replicate-key-status');
+                if (data.configured) {
+                    el.style.color = 'var(--success)';
+                    el.textContent = `Connected (${data.masked})`;
+                } else {
+                    el.style.color = 'var(--warning)';
+                    el.textContent = 'Not configured';
+                }
+            } catch (e) {}
+        }
+
+        // Processing overlay
+        function showProcessing() {
+            document.getElementById('processing-overlay').classList.add('active');
+            setProcessingStep('upload');
+        }
+
+        function hideProcessing() {
+            document.getElementById('processing-overlay').classList.remove('active');
+        }
+
+        function setProcessingStep(step) {
+            const steps = ['upload', 'transcribe', 'segment'];
+            const idx = steps.indexOf(step);
+
+            steps.forEach((s, i) => {
+                const el = document.getElementById(`proc-${s}`);
+                el.className = 'processing-step';
+                const icon = el.querySelector('.processing-step-icon');
+
+                if (i < idx) {
+                    el.classList.add('done');
+                    icon.innerHTML = '<span style="color: var(--success);">&#10003;</span>';
+                } else if (i === idx) {
+                    el.classList.add('active');
+                    icon.innerHTML = '<div class="spinner"></div>';
+                } else {
+                    icon.innerHTML = '<span style="color: var(--text-muted);">&#9675;</span>';
+                }
+            });
+
+            const pct = ((idx + 1) / steps.length) * 100;
+            document.getElementById('processing-progress-fill').style.width = `${pct}%`;
+        }
+
+        // Create Project
+        async function createProject() {
+            const hook = document.getElementById('hook-input').files[0];
+            const audio = document.getElementById('audio-input').files[0];
+            const name = document.getElementById('project-name').value || 'untitled';
+            const platform = document.getElementById('platform-select').value;
+            const imageStylePreset = document.getElementById('image-style-preset').value;
+            const imageStyleCustom = document.getElementById('image-style-custom').value;
+
+            if (!hook || !audio) {
+                showToast('Please upload hook video and audio file', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('hook', hook);
+            formData.append('audio', audio);
+            formData.append('name', name);
+            formData.append('platform', platform);
+            formData.append('image_style_preset', imageStylePreset);
+            formData.append('image_style_custom', imageStyleCustom);
+
+            const btn = document.getElementById('create-project-btn');
+            btn.disabled = true;
+
+            showProcessing();
+
+            try {
+                const response = await fetch(`${API_BASE}/api/projects`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    currentProject = data.project;
+                    setProcessingStep('transcribe');
+
+                    // Poll until transcription completes
+                    const poll = setInterval(async () => {
+                        try {
+                            const res = await fetch(`${API_BASE}/api/projects/${currentProject.id}`);
+                            const project = await res.json();
+                            currentProject = project;
+
+                            if (project.status === 'created') {
+                                clearInterval(poll);
+                                setProcessingStep('segment');
+
+                                // Brief pause to show segment step complete
+                                setTimeout(() => {
+                                    hideProcessing();
+                                    showToast(`${project.shots.length} shots created from transcript`, 'success');
+                                    renderShots();
+                                    showPanel('review');
+                                }, 600);
+                            } else if (project.status === 'transcription_failed') {
+                                clearInterval(poll);
+                                hideProcessing();
+                                showToast('Transcription failed: ' + (project.transcription?.error || 'Unknown error'), 'error');
+                            }
+                        } catch (err) {
+                            console.error('Poll error:', err);
+                        }
+                    }, 2000);
+                } else {
+                    hideProcessing();
+                    showToast(data.error || 'Failed to create project', 'error');
+                }
+            } catch (error) {
+                hideProcessing();
+                showToast('Error: ' + error.message, 'error');
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        // Render Shots
+        function renderShots() {
+            const grid = document.getElementById('shots-grid');
+            grid.innerHTML = '';
+            if (!currentProject || !currentProject.shots) return;
+
+            currentProject.shots.forEach(shot => {
+                const card = document.createElement('div');
+                card.className = 'shot-card';
+                card.id = `shot-${shot.id}`;
+
+                const refOptions = currentProject.shots
+                    .filter(s => s.id !== shot.id && (s.image_status === 'generated' || s.image_status === 'approved'))
+                    .map(s => `<option value="${s.id}" ${shot.reference_image?.source === 'shot_' + s.id ? 'selected' : ''}>Shot ${s.id}</option>`)
+                    .join('');
+
+                const currentRef = shot.reference_image?.type || 'none';
+                const animType = shot.animation_type || 'ken_burns_zoom_in';
+                const animLabel = ANIM_LABELS[animType] || animType;
+
+                // Build animation options
+                const animOptions = Object.entries(ANIM_LABELS).map(([key, label]) =>
+                    `<option value="${key}" ${animType === key ? 'selected' : ''}>${label}</option>`
+                ).join('');
+
+                const isSkipped = shot.skipped || shot.image_status === 'skipped';
+
+                card.innerHTML = `
+                    <div class="shot-preview" ${isSkipped ? 'style="opacity: 0.3;"' : ''}>
+                        ${shot.animated_clip_path
+                            ? `<video src="${API_BASE}/api/projects/${currentProject.id}/clips/${shot.id}/preview" controls></video>`
+                            : shot.image_path
+                                ? `<img src="${API_BASE}/api/projects/${currentProject.id}/shots/${shot.id}/image/preview">`
+                                : `<div class="shot-preview-placeholder">${
+                                    shot.image_status === 'generating' || shot.status === 'animating'
+                                        ? '<div class="spinner"></div>'
+                                        : isSkipped ? 'Skipped' : 'No image'
+                                }</div>`
+                        }
+                    </div>
+                    <div class="shot-info" ${isSkipped ? 'style="opacity: 0.4;"' : ''}>
+                        <div class="shot-meta">
+                            <span class="shot-badge number">Shot ${shot.id}</span>
+                            <span class="shot-badge duration">${shot.duration}s</span>
+                            ${isSkipped
+                                ? '<span class="shot-badge" style="background: var(--bg-elevated); color: var(--text-muted); text-decoration: line-through;">skipped</span>'
+                                : `<span class="shot-badge ${shot.image_status}">${shot.image_status}</span>`
+                            }
+                            ${!isSkipped && shot.status === 'animating' ? '<span class="shot-badge animating">animating</span>' : ''}
+                            ${!isSkipped && (shot.status === 'generated' || shot.status === 'approved') ? `<span class="shot-badge ${shot.status}">${shot.status}</span>` : ''}
+                            ${!isSkipped && shot.status === 'failed' ? '<span class="shot-badge failed">failed</span>' : ''}
+                            ${!isSkipped ? `<span class="shot-badge animation">${animLabel}</span>` : ''}
+                        </div>
+                        ${shot.error ? `<div style="color: var(--error); font-size: 0.75rem; padding: 0.375rem 0.5rem; background: var(--error-subtle); border-radius: 6px; margin-top: 0.25rem; cursor: pointer;" onclick="showErrorModal(); lastErrorDetails = '${shot.error.replace(/'/g, "\\'")}'">${shot.error.substring(0, 80)}${shot.error.length > 80 ? '...' : ''}</div>` : ''}
+                        <div class="shot-phrase">${shot.phrase}</div>
+                        ${!isSkipped ? `<div class="shot-prompt">${shot.prompt}</div>` : ''}
+                        ${!isSkipped ? `
+                        <div class="shot-controls">
+                            <div>
+                                <label>Animation</label>
+                                <select class="form-select" onchange="updateAnimation(${shot.id}, this.value)">
+                                    ${animOptions}
+                                </select>
+                            </div>
+                            <div>
+                                <label>Reference</label>
+                                <select class="form-select" onchange="setReference(${shot.id}, this.value)">
+                                    <option value="none" ${currentRef === 'none' ? 'selected' : ''}>None</option>
+                                    ${refOptions}
+                                </select>
+                            </div>
+                        </div>` : ''}
+                    </div>
+                    <div class="shot-actions">
+                        ${isSkipped ? `
+                            <button class="btn btn-secondary btn-sm" onclick="unskipShot(${shot.id})">Restore</button>
+                        ` : `
+                            ${shot.image_status === 'generated' ? `
+                                <button class="btn btn-success btn-sm" onclick="approveImage(${shot.id})">Approve</button>
+                                <button class="btn btn-danger btn-sm" onclick="rejectImage(${shot.id})">Reject</button>
+                            ` : ''}
+                            ${shot.image_status === 'approved' && shot.status === 'pending' ? `
+                                <button class="btn btn-primary btn-sm" onclick="animateShot(${shot.id})">Animate</button>
+                            ` : ''}
+                            ${shot.status === 'generated' ? `
+                                <button class="btn btn-success btn-sm" onclick="approveShot(${shot.id})">Approve Clip</button>
+                            ` : ''}
+                            <button class="btn btn-secondary btn-sm" onclick="openEditModal(${shot.id})">Edit</button>
+                            <button class="btn btn-secondary btn-sm" onclick="regenerateImage(${shot.id})">Regen</button>
+                            <button class="btn btn-sm" onclick="skipShot(${shot.id})" style="background: var(--bg-dark); color: var(--text-muted); border: 1px solid var(--border-subtle);">Skip</button>
+                        `}
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+
+            updateStats();
+        }
+
+        function updateStats() {
+            if (!currentProject) return;
+            const shots = currentProject.shots;
+            const total = shots.length;
+            const imagesApproved = shots.filter(s => s.image_status === 'approved').length;
+            const imagesGenerated = shots.filter(s => s.image_status === 'generated').length;
+            const animationsGenerated = shots.filter(s => s.status === 'generated').length;
+            const animatedCount = shots.filter(s => s.status === 'generated' || s.status === 'approved').length;
+            const pending = shots.filter(s => s.image_status === 'pending' || s.image_status === 'generating').length;
+
+            document.getElementById('stat-total').textContent = total;
+            document.getElementById('stat-approved').textContent = imagesApproved;
+            document.getElementById('stat-pending').textContent = pending;
+            document.getElementById('stat-rejected').textContent = shots.filter(s => s.image_status === 'rejected').length;
+
+            const progress = total > 0 ? (animatedCount / total) * 100 : 0;
+            document.getElementById('progress-fill').style.width = `${progress}%`;
+
+            document.getElementById('generate-videos-btn').disabled = imagesApproved === 0;
+
+            // Show/hide Approve All buttons
+            const approveImagesBtn = document.getElementById('approve-all-images-btn');
+            const approveAnimationsBtn = document.getElementById('approve-all-animations-btn');
+
+            if (imagesGenerated > 0) {
+                approveImagesBtn.style.display = 'inline-flex';
+                approveImagesBtn.textContent = `Approve All Images (${imagesGenerated})`;
+            } else {
+                approveImagesBtn.style.display = 'none';
+            }
+
+            if (animationsGenerated > 0) {
+                approveAnimationsBtn.style.display = 'inline-flex';
+                approveAnimationsBtn.textContent = `Approve All Animations (${animationsGenerated})`;
+            } else {
+                approveAnimationsBtn.style.display = 'none';
+            }
+
+            const clipsReady = shots.filter(s =>
+                (s.status === 'approved' || s.status === 'generated') && (s.animated_clip_path || s.trimmed_path)
+            ).length;
+            document.getElementById('proceed-to-assemble-btn').disabled = clipsReady === 0;
+        }
+
+        // Generate All Images
+        async function generateAllImages() {
+            if (!currentProject) return;
+            const btn = document.getElementById('generate-all-images-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<div class="spinner"></div> Generating...';
+
+            try {
+                const response = await fetch(`${API_BASE}/api/projects/${currentProject.id}/generate-all-images`, { method: 'POST' });
+                const data = await response.json();
+                if (data.success) {
+                    showToast('Image generation started', 'success');
+                    startPolling();
+                } else {
+                    showToast('Image generation failed: ' + (data.error || 'Unknown error'), 'error', data.details || data.error);
+                }
+            } catch (error) {
+                showToast('Error: ' + error.message, 'error', error.stack || error.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Generate All Images';
+            }
+        }
+
+        // Animate All
+        async function generateVideosFromImages() {
+            if (!currentProject) return;
+            const btn = document.getElementById('generate-videos-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<div class="spinner"></div> Animating...';
+
+            try {
+                const response = await fetch(`${API_BASE}/api/projects/${currentProject.id}/animate-all`, { method: 'POST' });
+                const data = await response.json();
+                if (data.success) {
+                    showToast('Animation started', 'success');
+                    startPolling();
+                } else {
+                    showToast('Animation failed: ' + (data.error || 'Unknown error'), 'error', data.details || data.error);
+                }
+            } catch (error) {
+                showToast('Error: ' + error.message, 'error', error.stack || error.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Animate All';
+            }
+        }
+
+        async function animateShot(shotId) {
+            try {
+                const response = await fetch(`${API_BASE}/api/projects/${currentProject.id}/shots/${shotId}/animate`, { method: 'POST' });
+                const data = await response.json();
+                if (data.success) {
+                    const shot = currentProject.shots.find(s => s.id === shotId);
+                    if (shot) shot.status = 'animating';
+                    renderShots();
+                    startPolling();
+                }
+            } catch (error) {
+                showToast('Error animating shot', 'error');
+            }
+        }
+
+        async function updateAnimation(shotId, animationType) {
+            try {
+                await fetch(`${API_BASE}/api/projects/${currentProject.id}/shots/${shotId}/animation`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ animation_type: animationType })
+                });
+                const shot = currentProject.shots.find(s => s.id === shotId);
+                if (shot) shot.animation_type = animationType;
+            } catch (error) {
+                showToast('Error updating animation', 'error');
+            }
+        }
+
+        // Image actions
+        async function approveImage(shotId) {
+            try {
+                await fetch(`${API_BASE}/api/projects/${currentProject.id}/shots/${shotId}/approve-image`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ generate_video: false })
+                });
+                const shot = currentProject.shots.find(s => s.id === shotId);
+                if (shot) shot.image_status = 'approved';
+                renderShots();
+            } catch (error) {
+                showToast('Error approving image', 'error');
+            }
+        }
+
+        async function rejectImage(shotId) {
+            try {
+                await fetch(`${API_BASE}/api/projects/${currentProject.id}/shots/${shotId}/reject-image`, { method: 'POST' });
+                const shot = currentProject.shots.find(s => s.id === shotId);
+                if (shot) shot.image_status = 'rejected';
+                renderShots();
+            } catch (error) {
+                showToast('Error rejecting image', 'error');
+            }
+        }
+
+        async function skipShot(shotId) {
+            try {
+                await fetch(`${API_BASE}/api/projects/${currentProject.id}/shots/${shotId}/skip`, { method: 'POST' });
+                const shot = currentProject.shots.find(s => s.id === shotId);
+                if (shot) { shot.skipped = true; shot.image_status = 'skipped'; }
+                renderShots();
+                showToast(`Shot ${shotId} skipped`, 'success');
+            } catch (error) { showToast('Error skipping shot', 'error'); }
+        }
+
+        async function unskipShot(shotId) {
+            try {
+                await fetch(`${API_BASE}/api/projects/${currentProject.id}/shots/${shotId}/unskip`, { method: 'POST' });
+                const shot = currentProject.shots.find(s => s.id === shotId);
+                if (shot) { shot.skipped = false; shot.image_status = 'pending'; }
+                renderShots();
+                showToast(`Shot ${shotId} restored`, 'success');
+            } catch (error) { showToast('Error restoring shot', 'error'); }
+        }
+
+        async function regenerateImage(shotId, newPrompt = null) {
+            try {
+                const body = newPrompt ? { prompt: newPrompt } : {};
+                await fetch(`${API_BASE}/api/projects/${currentProject.id}/shots/${shotId}/regenerate-image`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const shot = currentProject.shots.find(s => s.id === shotId);
+                if (shot) shot.image_status = 'generating';
+                renderShots();
+                startPolling();
+            } catch (error) {
+                showToast('Error regenerating image', 'error');
+            }
+        }
+
+        async function setReference(shotId, value) {
+            try {
+                if (value === 'none') {
+                    await fetch(`${API_BASE}/api/projects/${currentProject.id}/shots/${shotId}/reference`, { method: 'DELETE' });
+                } else {
+                    await fetch(`${API_BASE}/api/projects/${currentProject.id}/shots/${shotId}/reference`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ source_shot_id: parseInt(value) })
+                    });
+                }
+            } catch (error) {
+                showToast('Error setting reference', 'error');
+            }
+        }
+
+        // Polling
+        function startPolling() {
+            if (pollInterval) clearInterval(pollInterval);
+            pollInterval = setInterval(async () => {
+                try {
+                    const response = await fetch(`${API_BASE}/api/projects/${currentProject.id}`);
+                    const project = await response.json();
+                    currentProject = project;
+                    renderShots();
+
+                    const allImagesDone = project.shots.every(s => s.image_status !== 'pending' && s.image_status !== 'generating');
+                    const allAnimDone = project.shots.every(s => s.status !== 'generating' && s.status !== 'animating');
+
+                    if (allImagesDone && allAnimDone) {
+                        clearInterval(pollInterval);
+                        pollInterval = null;
+                        if (project.shots.some(s => s.status === 'generated' || s.status === 'approved')) {
+                            showToast('Generation complete', 'success');
+                        }
+                    }
+                } catch (error) {
+                    console.error('Polling error:', error);
+                }
+            }, 3000);
+        }
+
+        // Shot actions
+        async function approveShot(shotId) {
+            try {
+                await fetch(`${API_BASE}/api/projects/${currentProject.id}/shots/${shotId}/approve`, { method: 'POST' });
+                const shot = currentProject.shots.find(s => s.id === shotId);
+                if (shot) shot.status = 'approved';
+                renderShots();
+            } catch (error) {
+                showToast('Error approving shot', 'error');
+            }
+        }
+
+        // Modal
+        function setupModal() {
+            document.getElementById('cancel-edit-btn').addEventListener('click', closeEditModal);
+            document.getElementById('save-edit-btn').addEventListener('click', saveAndRegenerate);
+            document.getElementById('edit-modal').addEventListener('click', (e) => {
+                if (e.target.id === 'edit-modal') closeEditModal();
+            });
+        }
+
+        function openEditModal(shotId) {
+            currentEditShotId = shotId;
+            const shot = currentProject.shots.find(s => s.id === shotId);
+            if (shot) {
+                document.getElementById('edit-prompt-textarea').value = shot.prompt;
+                document.getElementById('edit-modal').classList.add('active');
+            }
+        }
+
+        function closeEditModal() {
+            document.getElementById('edit-modal').classList.remove('active');
+            currentEditShotId = null;
+        }
+
+        function saveAndRegenerate() {
+            const newPrompt = document.getElementById('edit-prompt-textarea').value;
+            regenerateImage(currentEditShotId, newPrompt);
+            closeEditModal();
+        }
+
+        // Timeline
+        function updateTimeline() {
+            const timeline = document.getElementById('timeline');
+            timeline.innerHTML = '';
+            if (!currentProject) return;
+
+            timeline.innerHTML += `
+                <div class="timeline-item">
+                    <span class="timeline-item-type hook">Hook</span>
+                    <span class="timeline-item-name">Intro footage</span>
+                    <span class="timeline-item-duration">~10s</span>
+                </div>
+            `;
+
+            currentProject.shots.forEach(shot => {
+                if (shot.skipped) return;
+                if (shot.status === 'approved' || shot.status === 'generated') {
+                    const animLabel = ANIM_LABELS[shot.animation_type] || '';
+                    timeline.innerHTML += `
+                        <div class="timeline-item">
+                            <span class="timeline-item-type broll">B-Roll</span>
+                            <span class="timeline-item-name">${shot.phrase.substring(0, 25)}... <small style="color: var(--accent);">[${animLabel}]</small></span>
+                            <span class="timeline-item-duration">${shot.duration}s</span>
+                        </div>
+                    `;
+                }
+            });
+        }
+
+        // Caption Preview
+        function setupCaptionPreview() {
+            const sizeInput = document.getElementById('caption-size');
+            const highlightInput = document.getElementById('caption-highlight');
+            const styleSelect = document.getElementById('caption-style');
+            const bgSelect = document.getElementById('caption-bg');
+
+            const updatePreview = () => {
+                const color = highlightInput.value;
+                const size = sizeInput.value / 4;
+                const style = styleSelect.value;
+                const bg = bgSelect.value;
+                const sample = document.getElementById('caption-sample');
+                const bgColor = `${color}22`;
+
+                if (style === 'karaoke') {
+                    const highlightStyle = bg === 'dark'
+                        ? `color: ${color}; background: ${bgColor}; padding: 2px 4px; border-radius: 4px;`
+                        : `color: ${color}; padding: 2px 4px;`;
+                    const dimStyle = bg === 'dark'
+                        ? 'color: var(--text-muted); padding: 2px 4px;'
+                        : 'color: var(--text-muted); padding: 2px 4px;';
+                    sample.style.fontSize = `${size}px`;
+                    sample.innerHTML = `
+                        <span style="${highlightStyle}">Did</span>
+                        <span style="${highlightStyle}">you</span>
+                        <span style="${dimStyle}">know</span>
+                        <span style="${dimStyle}">this</span>
+                        <span style="${dimStyle}">fact?</span>
+                    `;
+                } else {
+                    sample.style.fontSize = `${size}px`;
+                    sample.innerHTML = `
+                        <span style="color: white;">Sample </span>
+                        <span style="color: ${color}; font-weight: 800; font-size: 1.1em;">Caption</span>
+                        <span style="color: white;"> Text</span>
+                    `;
+                }
+            };
+
+            sizeInput.addEventListener('input', updatePreview);
+            highlightInput.addEventListener('input', updatePreview);
+            styleSelect.addEventListener('change', updatePreview);
+            bgSelect.addEventListener('change', updatePreview);
+        }
+
+        // Assemble Video
+        async function assembleVideo() {
+            if (!currentProject) return;
+            const btn = document.getElementById('assemble-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<div class="spinner"></div> Assembling...';
+
+            showAssemblyProgress();
+
+            try {
+                addAssemblyDetail('Sending assembly request...');
+                setAssemblyStep('concat');
+                addAssemblyDetail('Concatenating video clips...');
+
+                const response = await fetch(`${API_BASE}/api/projects/${currentProject.id}/assemble`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        platform: document.getElementById('platform-select').value,
+                        apply_effects: document.getElementById('apply-effects').checked,
+                        caption_style: document.getElementById('caption-style').value,
+                        caption_bg: document.getElementById('caption-bg').value,
+                        caption_highlight: document.getElementById('caption-highlight').value,
+                        caption_font: document.getElementById('caption-font').value,
+                        caption_size: parseInt(document.getElementById('caption-size').value),
+                        caption_bottom: parseInt(document.getElementById('caption-bottom').value)
+                    })
+                });
+
+                setAssemblyStep('audio');
+                addAssemblyDetail('Adding voiceover audio...');
+
+                const data = await response.json();
+
+                if (data.success) {
+                    if (document.getElementById('apply-effects').checked) {
+                        setAssemblyStep('effects');
+                        addAssemblyDetail('Remotion effects applied successfully');
+                    }
+
+                    setAssemblyStep('final');
+                    addAssemblyDetail('Finalizing output...');
+                    addAssemblyDetail(`Output: ${data.output_path || 'final video'}`);
+
+                    setTimeout(() => {
+                        hideAssemblyProgress();
+                        showToast(`Video assembled${data.has_effects ? ' with effects' : ''}`, 'success');
+
+                        // Show video preview
+                        const videoPreview = document.getElementById('final-video-preview');
+                        videoPreview.src = `${API_BASE}/api/projects/${currentProject.id}/preview?t=${Date.now()}`;
+                        document.getElementById('download-section').style.display = 'block';
+
+                        // Scroll to download section
+                        document.getElementById('download-section').scrollIntoView({ behavior: 'smooth' });
+                    }, 500);
+                } else {
+                    hideAssemblyProgress();
+                    const errorDetails = data.details || data.error || 'Unknown error';
+                    showToast('Assembly failed: ' + (data.error || 'Unknown error'), 'error', errorDetails);
+                }
+            } catch (error) {
+                hideAssemblyProgress();
+                showToast('Error: ' + error.message, 'error', error.stack || error.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Assemble Final Video';
+            }
+        }
+
+        function downloadVideo() {
+            if (!currentProject) return;
+            window.location.href = `${API_BASE}/api/projects/${currentProject.id}/download`;
+        }
+
+        // Toast with optional error details
+        let lastErrorDetails = null;
+
+        function showToast(message, type = 'info', details = null) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+
+            if (type === 'error' && details) {
+                lastErrorDetails = details;
+                toast.innerHTML = `${message} <button onclick="showErrorModal()" style="background: none; border: none; color: var(--accent); cursor: pointer; text-decoration: underline; margin-left: 0.5rem;">Details</button>`;
+            } else {
+                toast.textContent = message;
+            }
+
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), type === 'error' ? 8000 : 4000);
+        }
+
+        // Error Modal
+        function showErrorModal() {
+            if (lastErrorDetails) {
+                document.getElementById('error-modal-content').textContent =
+                    typeof lastErrorDetails === 'object' ? JSON.stringify(lastErrorDetails, null, 2) : lastErrorDetails;
+                document.getElementById('error-modal').classList.add('active');
+            }
+        }
+
+        function closeErrorModal() {
+            document.getElementById('error-modal').classList.remove('active');
+        }
+
+        function copyError() {
+            const content = document.getElementById('error-modal-content').textContent;
+            navigator.clipboard.writeText(content).then(() => {
+                showToast('Error copied to clipboard', 'success');
+            });
+        }
+
+        // Approve All Images
+        async function approveAllImages() {
+            if (!currentProject) return;
+            const shotsToApprove = currentProject.shots.filter(s => s.image_status === 'generated');
+            if (shotsToApprove.length === 0) {
+                showToast('No images to approve', 'info');
+                return;
+            }
+
+            const btn = document.getElementById('approve-all-images-btn');
+            btn.disabled = true;
+            btn.textContent = 'Approving...';
+
+            let approved = 0;
+            for (const shot of shotsToApprove) {
+                try {
+                    await fetch(`${API_BASE}/api/projects/${currentProject.id}/shots/${shot.id}/approve-image`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ generate_video: false })
+                    });
+                    shot.image_status = 'approved';
+                    approved++;
+                } catch (e) {
+                    console.error(`Failed to approve shot ${shot.id}:`, e);
+                }
+            }
+
+            renderShots();
+            showToast(`Approved ${approved} images`, 'success');
+            btn.disabled = false;
+            btn.textContent = 'Approve All Images';
+        }
+
+        // Approve All Animations
+        async function approveAllAnimations() {
+            if (!currentProject) return;
+            const shotsToApprove = currentProject.shots.filter(s => s.status === 'generated');
+            if (shotsToApprove.length === 0) {
+                showToast('No animations to approve', 'info');
+                return;
+            }
+
+            const btn = document.getElementById('approve-all-animations-btn');
+            btn.disabled = true;
+            btn.textContent = 'Approving...';
+
+            let approved = 0;
+            for (const shot of shotsToApprove) {
+                try {
+                    await fetch(`${API_BASE}/api/projects/${currentProject.id}/shots/${shot.id}/approve`, { method: 'POST' });
+                    shot.status = 'approved';
+                    approved++;
+                } catch (e) {
+                    console.error(`Failed to approve shot ${shot.id}:`, e);
+                }
+            }
+
+            renderShots();
+            showToast(`Approved ${approved} animations`, 'success');
+            btn.disabled = false;
+            btn.textContent = 'Approve All Animations';
+        }
+
+        // Assembly Progress
+        function showAssemblyProgress() {
+            document.getElementById('assembly-overlay').classList.add('active');
+            document.getElementById('assembly-details').textContent = 'Starting assembly...';
+            setAssemblyStep('concat');
+        }
+
+        function hideAssemblyProgress() {
+            document.getElementById('assembly-overlay').classList.remove('active');
+        }
+
+        function setAssemblyStep(step) {
+            const steps = ['concat', 'audio', 'effects', 'final'];
+            const idx = steps.indexOf(step);
+
+            steps.forEach((s, i) => {
+                const el = document.getElementById(`asm-${s}`);
+                el.className = 'processing-step';
+                const icon = el.querySelector('.processing-step-icon');
+
+                if (i < idx) {
+                    el.classList.add('done');
+                    icon.innerHTML = '<span style="color: var(--success);">&#10003;</span>';
+                } else if (i === idx) {
+                    el.classList.add('active');
+                    icon.innerHTML = '<div class="spinner"></div>';
+                } else {
+                    icon.innerHTML = '<span style="color: var(--text-muted);">&#9675;</span>';
+                }
+            });
+
+            const pct = ((idx + 1) / steps.length) * 100;
+            document.getElementById('assembly-progress-fill').style.width = `${pct}%`;
+        }
+
+        function addAssemblyDetail(message) {
+            const details = document.getElementById('assembly-details');
+            const time = new Date().toLocaleTimeString();
+            details.textContent += `\n[${time}] ${message}`;
+            details.scrollTop = details.scrollHeight;
+        }
+
+        // Effects Editor
+        function renderEffectsEditor() {
+            const container = document.getElementById('effects-editor-content');
+            if (!container || !currentProject) return;
+            container.innerHTML = '';
+
+            const effectIcons = {
+                'zoom_pulse': '[ ]', 'screen_shake': '~', 'emoji': ':)',
+                'flash': '*', 'particles': '..', 'kinetic_text': 'Aa', 'number_counter': '#'
+            };
+
+            currentProject.shots.forEach(shot => {
+                const effects = shot.effects || [];
+                const group = document.createElement('div');
+                group.style.cssText = 'margin-bottom: 0.75rem; padding: 0.75rem; background: var(--bg-dark); border-radius: 8px;';
+
+                group.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                        <strong style="font-size: 0.8125rem;">Shot ${shot.id}: "${shot.phrase.substring(0, 30)}..."</strong>
+                        <button class="btn btn-secondary btn-sm" onclick="openAddEffectModal(${shot.id})" style="font-size: 0.6875rem;">+ Add</button>
+                    </div>
+                    <div>
+                        ${effects.length === 0 ? '<span style="color: var(--text-muted); font-size: 0.75rem;">No effects</span>' : ''}
+                        ${effects.map(eff => `
+                            <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.375rem; background: var(--bg-elevated); border-radius: 6px; margin-bottom: 0.375rem; font-size: 0.75rem;">
+                                <label style="display: flex; align-items: center; gap: 0.375rem; cursor: pointer;">
+                                    <input type="checkbox" ${eff.enabled ? 'checked' : ''} onchange="toggleEffect(${shot.id}, '${eff.id}', this.checked)" style="accent-color: var(--accent);">
+                                    <span>${effectIcons[eff.type] || ''} ${eff.type}</span>
+                                </label>
+                                <span style="font-size: 0.6875rem; color: var(--text-muted);">${eff.trigger_phrase ? '@ "' + eff.trigger_phrase + '"' : ''}</span>
+                                ${renderEffectParams(shot.id, eff)}
+                                <button onclick="deleteEffect(${shot.id}, '${eff.id}')" style="background: none; border: none; color: var(--error); cursor: pointer; margin-left: auto;">x</button>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+                container.appendChild(group);
+            });
+        }
+
+        function renderEffectParams(shotId, effect) {
+            const params = effect.parameters || {};
+            switch (effect.type) {
+                case 'zoom_pulse':
+                    return `<label style="font-size: 0.6875rem; display: flex; align-items: center; gap: 0.25rem;">Int: <input type="number" value="${params.intensity || 1.08}" step="0.01" min="1.02" max="1.2" style="width: 52px; padding: 0.1875rem; font-size: 0.6875rem; background: var(--bg-dark); border: 1px solid var(--border-subtle); border-radius: 4px; color: var(--text-primary);" onchange="updateEffectParam(${shotId}, '${effect.id}', 'intensity', parseFloat(this.value))"></label>`;
+                case 'screen_shake':
+                    return `<label style="font-size: 0.6875rem; display: flex; align-items: center; gap: 0.25rem;">Int: <input type="number" value="${params.intensity || 12}" min="5" max="25" style="width: 44px; padding: 0.1875rem; font-size: 0.6875rem; background: var(--bg-dark); border: 1px solid var(--border-subtle); border-radius: 4px; color: var(--text-primary);" onchange="updateEffectParam(${shotId}, '${effect.id}', 'intensity', parseInt(this.value))"></label>`;
+                case 'emoji':
+                    return `<select style="padding: 0.1875rem; font-size: 0.75rem; background: var(--bg-dark); border: 1px solid var(--border-subtle); border-radius: 4px; color: var(--text-primary);" onchange="updateEffectParam(${shotId}, '${effect.id}', 'emoji', this.value)">${['*', '!', '?', '<3', ':o', '~', '+'].map(e => `<option value="${e}" ${params.emoji === e ? 'selected' : ''}>${e}</option>`).join('')}</select>`;
+                default:
+                    return '';
+            }
+        }
+
+        async function toggleEffect(shotId, effectId, enabled) {
+            try {
+                await fetch(`${API_BASE}/api/projects/${currentProject.id}/shots/${shotId}/effects/${effectId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enabled })
+                });
+                const shot = currentProject.shots.find(s => s.id === shotId);
+                if (shot) {
+                    const effect = shot.effects.find(e => e.id === effectId);
+                    if (effect) effect.enabled = enabled;
+                }
+            } catch (error) {
+                showToast('Error updating effect', 'error');
+            }
+        }
+
+        async function updateEffectParam(shotId, effectId, paramName, value) {
+            try {
+                await fetch(`${API_BASE}/api/projects/${currentProject.id}/shots/${shotId}/effects/${effectId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ parameters: { [paramName]: value } })
+                });
+                const shot = currentProject.shots.find(s => s.id === shotId);
+                if (shot) {
+                    const effect = shot.effects.find(e => e.id === effectId);
+                    if (effect && effect.parameters) effect.parameters[paramName] = value;
+                }
+            } catch (error) {
+                showToast('Error updating effect', 'error');
+            }
+        }
+
+        async function deleteEffect(shotId, effectId) {
+            try {
+                await fetch(`${API_BASE}/api/projects/${currentProject.id}/shots/${shotId}/effects/${effectId}`, { method: 'DELETE' });
+                const shot = currentProject.shots.find(s => s.id === shotId);
+                if (shot) shot.effects = shot.effects.filter(e => e.id !== effectId);
+                renderEffectsEditor();
+            } catch (error) {
+                showToast('Error deleting effect', 'error');
+            }
+        }
+
+        async function resetEffects() {
+            if (!currentProject) return;
+            try {
+                await fetch(`${API_BASE}/api/projects/${currentProject.id}/reset-effects`, { method: 'POST' });
+                const response = await fetch(`${API_BASE}/api/projects/${currentProject.id}`);
+                currentProject = await response.json();
+                renderEffectsEditor();
+                showToast('Effects reset', 'success');
+            } catch (error) {
+                showToast('Error resetting effects', 'error');
+            }
+        }
+
+        // Post Caption
+        async function generatePostCaption() {
+            if (!currentProject) return;
+            const btn = document.getElementById('generate-caption-btn');
+            btn.disabled = true;
+            btn.textContent = 'Generating...';
+            try {
+                const res = await fetch(`${API_BASE}/api/projects/${currentProject.id}/generate-caption`, { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    document.getElementById('post-caption-text').value = data.caption;
+                    updateCaptionCharCount();
+                    showToast('Caption generated', 'success');
+                } else {
+                    showToast(data.error || 'Failed to generate caption', 'error');
+                }
+            } catch (e) { showToast('Error generating caption', 'error'); }
+            finally { btn.disabled = false; btn.textContent = 'Generate'; }
+        }
+
+        function copyPostCaption() {
+            const text = document.getElementById('post-caption-text').value;
+            if (!text) { showToast('No caption to copy', 'error'); return; }
+            navigator.clipboard.writeText(text).then(() => {
+                showToast('Caption copied to clipboard', 'success');
+            }).catch(() => {
+                // Fallback for older browsers
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                showToast('Caption copied', 'success');
+            });
+        }
+
+        function updateCaptionCharCount() {
+            const text = document.getElementById('post-caption-text').value;
+            document.getElementById('caption-char-count').textContent = `${text.length} chars`;
+        }
+
+        function openAddEffectModal(shotId) {
+            const effectType = prompt('Effect type (zoom_pulse, screen_shake, emoji, flash, particles, kinetic_text, number_counter):');
+            if (!effectType) return;
+            const validTypes = ['zoom_pulse', 'screen_shake', 'emoji', 'flash', 'particles', 'kinetic_text', 'number_counter'];
+            if (!validTypes.includes(effectType)) {
+                showToast('Invalid effect type', 'error');
+                return;
+            }
+            addEffect(shotId, effectType);
+        }
+
+        async function addEffect(shotId, effectType) {
+            const defaults = {
+                'zoom_pulse': { intensity: 1.08, duration: 20 },
+                'screen_shake': { intensity: 12, duration: 15 },
+                'emoji': { emoji: '*', x: 50, y: 50, duration: 30 },
+                'flash': { duration: 6, color: 'white' },
+                'particles': { x: 50, y: 50, count: 15, duration: 25 },
+                'kinetic_text': { words_per_second: 4, duration: 30 },
+                'number_counter': { start: 0, end: 100, duration: 30 }
+            };
+
+            try {
+                await fetch(`${API_BASE}/api/projects/${currentProject.id}/shots/${shotId}/effects`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ type: effectType, parameters: defaults[effectType] || {} })
+                });
+                const response = await fetch(`${API_BASE}/api/projects/${currentProject.id}`);
+                currentProject = await response.json();
+                renderEffectsEditor();
+                showToast('Effect added', 'success');
+            } catch (error) {
+                showToast('Error adding effect', 'error');
+            }
+        }
+    </script>
+</body>
+</html>

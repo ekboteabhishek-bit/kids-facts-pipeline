@@ -1,0 +1,120 @@
+{
+  "replicate_api_token": "YOUR_REPLICATE_API_TOKEN_HERE",
+  "openai_api_key": "",
+  "image_model": "flux",
+  "paths": {
+    "uploads": "uploads",
+    "clips": "clips",
+    "outputs": "outputs",
+    "temp": "temp",
+    "projects_db": "projects.json"
+  },
+  "video": {
+    "clip_duration_range": [0.8, 2.0],
+    "fps": 30,
+    "resolution": "1080x1920"
+  },
+  "image_styles": {
+    "presets": {
+      "pixar_3d": "Pixar-style 3D animation, vibrant colors, expressive characters, soft lighting, detailed textures",
+      "anime": "Anime style illustration, bold outlines, expressive eyes, dynamic poses, vibrant cel-shaded colors",
+      "realistic": "Photorealistic, ultra detailed, natural lighting, 8K photography, sharp focus",
+      "cartoon": "Colorful cartoon style, bold outlines, exaggerated features, playful aesthetic, bright saturated colors",
+      "watercolor": "Watercolor painting style, soft edges, flowing colors, artistic brush strokes, dreamy aesthetic",
+      "comic_book": "Comic book style, bold ink outlines, halftone dots, dynamic action poses, vibrant pop colors",
+      "claymation": "Claymation style, stop-motion aesthetic, textured clay figures, warm studio lighting",
+      "retro_80s": "Retro 80s aesthetic, neon colors, synthwave vibes, geometric shapes, chrome effects",
+      "fantasy": "Fantasy art style, magical atmosphere, ethereal lighting, epic scale, mythical creatures",
+      "minimalist": "Minimalist flat design, simple shapes, limited color palette, clean composition"
+    },
+    "default": "realistic"
+  },
+  "animation": {
+    "default_transition": "crossfade",
+    "default_transition_duration": 0.3,
+    "types": {
+      "ken_burns_zoom_in": { "start_zoom": 1.0, "end_zoom": 1.15, "pan_x": 25, "pan_y": -15 },
+      "ken_burns_zoom_out": { "start_zoom": 1.25, "end_zoom": 1.0, "pan_x": -15, "pan_y": 10 },
+      "pan_left": { "start_zoom": 1.1, "end_zoom": 1.1, "pan_x": -40, "pan_y": 0 },
+      "pan_right": { "start_zoom": 1.1, "end_zoom": 1.1, "pan_x": 40, "pan_y": 0 },
+      "tilt_up": { "start_zoom": 1.1, "end_zoom": 1.1, "pan_x": 0, "pan_y": -40 },
+      "tilt_down": { "start_zoom": 1.1, "end_zoom": 1.1, "pan_x": 0, "pan_y": 40 },
+      "zoom_pulse": { "start_zoom": 1.0, "end_zoom": 1.4, "speed": "fast" },
+      "slow_drift": { "start_zoom": 1.05, "end_zoom": 1.05, "pan_x": 20, "pan_y": 0 },
+      "dolly_push": { "start_zoom": 1.0, "end_zoom": 1.35, "pan_x": 0, "pan_y": 0 },
+      "pull_back": { "start_zoom": 1.5, "end_zoom": 1.0, "pan_x": 0, "pan_y": 0 }
+    }
+  },
+  "platforms": {
+    "tiktok": {
+      "font": "Nunito-Bold",
+      "font_size": 64,
+      "position_bottom": 180,
+      "highlight_color": "#4A90A4"
+    },
+    "instagram": {
+      "font": "Nunito-Bold",
+      "font_size": 60,
+      "position_bottom": 200,
+      "highlight_color": "#E1306C"
+    },
+    "youtube": {
+      "font": "Nunito-Bold",
+      "font_size": 56,
+      "position_bottom": 120,
+      "highlight_color": "#FF0000"
+    }
+  },
+  "style": {
+    "prompt_suffix": "warm color temperature, soft diffused lighting, cinematic quality, 4K resolution",
+    "color_grade": {
+      "brightness": 0.02,
+      "contrast": 1.05,
+      "saturation": 0.92,
+      "warmth": 0.08
+    }
+  },
+  "effects": {
+    "types": {
+      "zoom_pulse": {
+        "default_intensity": 1.08,
+        "default_duration": 20
+      },
+      "screen_shake": {
+        "default_intensity": 12,
+        "default_duration": 15
+      },
+      "emoji": {
+        "default_duration": 30
+      },
+      "flash": {
+        "default_duration": 6
+      },
+      "particles": {
+        "default_count": 15,
+        "default_duration": 25
+      }
+    }
+  },
+  "sfx": {
+    "enabled": true,
+    "triggers": {
+      "boom": "impact.wav",
+      "explode": "impact.wav",
+      "pop": "pop.wav",
+      "burst": "pop.wav",
+      "whoosh": "whoosh.wav",
+      "fast": "whoosh.wav",
+      "million": "ding.wav",
+      "billion": "ding.wav"
+    }
+  },
+  "clip_settings": {
+    "default_duration": 1.5,
+    "trim_min": 0.8,
+    "trim_max": 2.0
+  },
+  "transcription": {
+    "whisper_model": "base"
+  }
+}

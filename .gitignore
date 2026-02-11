@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
+
+# Environment variables
+.env
+.env.local
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Project-specific (local data)
+uploads/
+clips/
+outputs/
+temp/
+projects.json
+*.mp4
+*.mp3
+*.wav
+*.webm
+
+# Node (remotion)
+remotion/node_modules/
+remotion/.cache/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Claude settings
+.claude/
