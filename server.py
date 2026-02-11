@@ -159,12 +159,21 @@ CONFIG_PATH = Path(__file__).parent / 'config.json'
 with open(CONFIG_PATH) as f:
     CONFIG = json.load(f)
 
+# Use /var/data on Render for persistence across deploys
+if os.environ.get('RENDER') and Path('/var/data').exists():
+    PERSISTENT_DATA_DIR = Path('/var/data')
+    print(f"Running on Render - using persistent storage at {PERSISTENT_DATA_DIR}")
+    # Override config paths to use persistent storage
+    for path_key in ['uploads', 'clips', 'outputs', 'temp']:
+        CONFIG['paths'][path_key] = str(PERSISTENT_DATA_DIR / path_key)
+    PROJECTS_DB_PATH = PERSISTENT_DATA_DIR / 'projects.json'
+else:
+    PERSISTENT_DATA_DIR = None
+    PROJECTS_DB_PATH = Path(CONFIG['paths'].get('projects_db', 'projects.json'))
+
 # Ensure directories exist
 for path_key in ['uploads', 'clips', 'outputs', 'temp']:
     Path(CONFIG['paths'][path_key]).mkdir(parents=True, exist_ok=True)
-
-# Project persistence
-PROJECTS_DB_PATH = Path(CONFIG['paths'].get('projects_db', 'projects.json'))
 
 def load_projects():
     """Load projects from JSON file."""
@@ -274,7 +283,7 @@ def transcribe_audio_openai(audio_path, language="en"):
 
 def transcribe_audio_file(audio_path, chunk_duration=30, language="en-US"):
     """
-    Transcribe an audio file using Whisper (local or OpenAI API).
+    Transcribe an audio file using Whisper (OpenAI API preferred, local as fallback).
     Returns (full_text, average_confidence) tuple.
     """
     # Validate file format
@@ -282,7 +291,13 @@ def transcribe_audio_file(audio_path, chunk_duration=30, language="en-US"):
     if file_ext not in ['wav', 'mp3', 'm4a', 'ogg', 'flac', 'aac', 'wma', 'webm']:
         raise Exception("Unsupported audio format: " + file_ext)
 
-    # Try local Whisper first, fall back to OpenAI API
+    # Try OpenAI Whisper API first (much faster), fall back to local Whisper
+    if OPENAI_AVAILABLE:
+        api_key = CONFIG.get('openai_api_key') or os.environ.get('OPENAI_API_KEY')
+        if api_key:
+            return transcribe_audio_openai(audio_path, language)
+
+    # Fall back to local Whisper
     if WHISPER_AVAILABLE:
         model = get_whisper_model()
         lang = language.split('-')[0] if language else "en"
@@ -304,10 +319,6 @@ def transcribe_audio_file(audio_path, chunk_duration=30, language="en-US"):
 
         print(f"Local Whisper transcription complete: {len(text)} chars, confidence: {avg_confidence:.2f}")
         return text, avg_confidence
-
-    elif OPENAI_AVAILABLE:
-        # Fall back to OpenAI Whisper API
-        return transcribe_audio_openai(audio_path, language)
 
     else:
         raise Exception("No transcription method available. Install openai-whisper or configure OpenAI API key.")
