@@ -76,7 +76,83 @@ except ImportError:
     print("Warning: openai not installed. LLM-based prompt generation disabled.")
 
 app = Flask(__name__, static_folder='static')
-CORS(app)
+CORS(app, supports_credentials=True)
+
+# Secret key for sessions
+app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
+
+# Simple password auth
+APP_PASSWORD = os.environ.get('APP_PASSWORD', 'kidsfacts2024')
+
+from functools import wraps
+from flask import session, redirect, url_for
+
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('authenticated'):
+            if request.is_json or request.path.startswith('/api/'):
+                return jsonify({'error': 'Unauthorized'}), 401
+            return redirect('/login')
+        return f(*args, **kwargs)
+    return decorated_function
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        data = request.get_json() if request.is_json else request.form
+        password = data.get('password', '')
+        if password == APP_PASSWORD:
+            session['authenticated'] = True
+            if request.is_json:
+                return jsonify({'success': True})
+            return redirect('/')
+        if request.is_json:
+            return jsonify({'error': 'Invalid password'}), 401
+        return '''
+        <!DOCTYPE html>
+        <html><head><title>Login</title>
+        <style>body{font-family:system-ui;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#1a1a2e;}
+        .login{background:#16213e;padding:40px;border-radius:12px;text-align:center;color:#fff;}
+        input{padding:12px;font-size:16px;border:none;border-radius:6px;margin:10px 0;width:200px;}
+        button{padding:12px 24px;font-size:16px;background:#4a90a4;color:#fff;border:none;border-radius:6px;cursor:pointer;}
+        button:hover{background:#3a7a94;}.error{color:#ff6b6b;}</style></head>
+        <body><div class="login"><h2>Kids Facts Pipeline</h2><p class="error">Invalid password</p>
+        <form method="post"><input type="password" name="password" placeholder="Password" autofocus>
+        <br><button type="submit">Login</button></form></div></body></html>
+        '''
+    return '''
+    <!DOCTYPE html>
+    <html><head><title>Login</title>
+    <style>body{font-family:system-ui;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#1a1a2e;}
+    .login{background:#16213e;padding:40px;border-radius:12px;text-align:center;color:#fff;}
+    input{padding:12px;font-size:16px;border:none;border-radius:6px;margin:10px 0;width:200px;}
+    button{padding:12px 24px;font-size:16px;background:#4a90a4;color:#fff;border:none;border-radius:6px;cursor:pointer;}
+    button:hover{background:#3a7a94;}</style></head>
+    <body><div class="login"><h2>Kids Facts Pipeline</h2>
+    <form method="post"><input type="password" name="password" placeholder="Password" autofocus>
+    <br><button type="submit">Login</button></form></div></body></html>
+    '''
+
+@app.route('/logout')
+def logout():
+    session.pop('authenticated', None)
+    return redirect('/login')
+
+@app.before_request
+def check_auth():
+    # Allow login/logout routes without auth
+    if request.path in ['/login', '/logout']:
+        return None
+    # Allow static files needed for login page
+    if request.path.startswith('/static/'):
+        return None
+    # Check authentication
+    if not session.get('authenticated'):
+        if request.is_json or request.path.startswith('/api/'):
+            return jsonify({'error': 'Unauthorized'}), 401
+        return redirect('/login')
+    return None
 
 # Load config
 CONFIG_PATH = Path(__file__).parent / 'config.json'
