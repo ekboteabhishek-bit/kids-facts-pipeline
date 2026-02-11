@@ -283,7 +283,7 @@ def transcribe_audio_openai(audio_path, language="en"):
 
 def transcribe_audio_file(audio_path, chunk_duration=30, language="en-US"):
     """
-    Transcribe an audio file using Whisper (OpenAI API preferred, local as fallback).
+    Transcribe an audio file using OpenAI Whisper API.
     Returns (full_text, average_confidence) tuple.
     """
     # Debug logging
@@ -291,46 +291,23 @@ def transcribe_audio_file(audio_path, chunk_duration=30, language="en-US"):
     print(f"[TRANSCRIPTION DEBUG] WHISPER_AVAILABLE: {WHISPER_AVAILABLE}")
     api_key = CONFIG.get('openai_api_key') or os.environ.get('OPENAI_API_KEY')
     print(f"[TRANSCRIPTION DEBUG] API key configured: {bool(api_key)}")
+    print(f"[TRANSCRIPTION DEBUG] API key from config: {bool(CONFIG.get('openai_api_key'))}")
+    print(f"[TRANSCRIPTION DEBUG] API key from env: {bool(os.environ.get('OPENAI_API_KEY'))}")
 
     # Validate file format
     file_ext = audio_path.lower().split('.')[-1]
     if file_ext not in ['wav', 'mp3', 'm4a', 'ogg', 'flac', 'aac', 'wma', 'webm']:
         raise Exception("Unsupported audio format: " + file_ext)
 
-    # Try OpenAI Whisper API first (much faster), fall back to local Whisper
-    if OPENAI_AVAILABLE:
-        if api_key:
-            print("[TRANSCRIPTION] Using OpenAI Whisper API (cloud)")
-            return transcribe_audio_openai(audio_path, language)
-        else:
-            print("[TRANSCRIPTION] OpenAI available but no API key configured")
+    # ALWAYS use OpenAI Whisper API - no fallback to slow local Whisper
+    if not OPENAI_AVAILABLE:
+        raise Exception("OpenAI package not installed. Cannot transcribe.")
 
-    # Fall back to local Whisper
-    if WHISPER_AVAILABLE:
-        print("[TRANSCRIPTION] Falling back to LOCAL Whisper (slow!)")
-        model = get_whisper_model()
-        lang = language.split('-')[0] if language else "en"
+    if not api_key:
+        raise Exception("OPENAI_API_KEY environment variable not set. Cannot transcribe.")
 
-        print(f"Transcribing with local Whisper ({lang})...")
-        result = model.transcribe(
-            audio_path,
-            language=lang,
-            fp16=False
-        )
-
-        text = result.get('text', '').strip()
-        segments = result.get('segments', [])
-        if segments:
-            avg_confidence = sum(seg.get('no_speech_prob', 0) for seg in segments)
-            avg_confidence = 1.0 - (avg_confidence / len(segments))
-        else:
-            avg_confidence = 0.9 if text else 0.0
-
-        print(f"Local Whisper transcription complete: {len(text)} chars, confidence: {avg_confidence:.2f}")
-        return text, avg_confidence
-
-    else:
-        raise Exception("No transcription method available. Install openai-whisper or configure OpenAI API key.")
+    print("[TRANSCRIPTION] Using OpenAI Whisper API (cloud)")
+    return transcribe_audio_openai(audio_path, language)
 
 
 def run_transcription(transcription_id, audio_path):
