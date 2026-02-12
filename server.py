@@ -1622,14 +1622,19 @@ def animate_image_to_clip(image_path, output_path, duration, animation_type, ani
 
 def animate_shot_image(project_id, shot_id):
     """Create animated clip from approved shot image using FFmpeg zoompan."""
-    project = PROJECTS[project_id]
-    shot = project['shots'][shot_id - 1]
+    print(f"[ANIMATE] Starting animation for project {project_id}, shot {shot_id}")
 
+    # Always use PROJECTS[project_id] directly to avoid reference orphaning
+    def get_shot():
+        return PROJECTS[project_id]['shots'][shot_id - 1]
+
+    shot = get_shot()
     if not shot.get('image_path'):
         raise Exception("Shot has no image")
 
     try:
-        shot['status'] = 'animating'
+        get_shot()['status'] = 'animating'
+        save_projects()
 
         clip_filename = f"{project_id}_shot_{shot_id:02d}_animated.mp4"
         clip_path = str(Path(CONFIG['paths']['clips']) / clip_filename)
@@ -1643,14 +1648,18 @@ def animate_shot_image(project_id, shot_id):
             CONFIG['video'].get('resolution', '1080x1920')
         )
 
-        shot['status'] = 'generated'
-        shot['animated_clip_path'] = clip_path
+        get_shot()['status'] = 'generated'
+        get_shot()['animated_clip_path'] = clip_path
+        save_projects()
+        print(f"[ANIMATE] Shot {shot_id}: Animation complete")
         return True
 
     except Exception as e:
-        print(f"Error animating shot: {e}")
-        shot['status'] = 'failed'
-        shot['error'] = str(e)
+        print(f"[ANIMATE] Shot {shot_id}: ERROR - {e}")
+        if project_id in PROJECTS:
+            get_shot()['status'] = 'failed'
+            get_shot()['error'] = str(e)
+            save_projects()
         return False
 
 
@@ -2563,9 +2572,9 @@ def generate_all_images(project_id):
             if shot['image_status'] == 'pending' and not shot.get('skipped'):
                 generate_image_for_shot(project_id, shot['id'])
                 generated += 1
-                # Rate limit: wait 2 seconds between requests to avoid 429 errors
+                # Rate limit: wait 3 seconds between requests to avoid 429 errors
                 if generated < pending_count:
-                    time.sleep(2)
+                    time.sleep(3)
 
         print(f"[IMAGE GEN] Batch generation complete")
 
@@ -2674,12 +2683,22 @@ def animate_all_shots(project_id):
     if project_id not in PROJECTS:
         return jsonify({'error': 'Project not found'}), 404
 
-    project = PROJECTS[project_id]
-
     def animate_all():
-        for shot in project['shots']:
+        # Always get fresh reference to avoid orphaning
+        shots = PROJECTS[project_id]['shots']
+        pending_count = sum(1 for s in shots if s['image_status'] == 'approved' and s['status'] == 'pending' and not s.get('skipped'))
+        print(f"[ANIMATE] Starting batch animation for {pending_count} shots")
+
+        animated = 0
+        for shot in shots:
             if shot['image_status'] == 'approved' and shot['status'] == 'pending' and not shot.get('skipped'):
                 animate_shot_image(project_id, shot['id'])
+                animated += 1
+                # Rate limit: wait 3 seconds between requests to avoid 429 errors
+                if animated < pending_count:
+                    time.sleep(3)
+
+        print(f"[ANIMATE] Batch animation complete")
 
     thread = threading.Thread(target=animate_all)
     thread.start()
