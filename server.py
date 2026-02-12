@@ -2182,6 +2182,8 @@ def create_project():
     def transcribe_and_segment():
         import traceback
         try:
+            # IMPORTANT: Always reference PROJECTS[project_id] directly, not local 'project' var
+            # because sync_projects() may replace the dict reference during polling
             print(f"[PROJECT {project_id}] Starting transcription pipeline...")
             print(f"[PROJECT {project_id}] Audio path: {audio_path}")
             print(f"[PROJECT {project_id}] Audio file exists: {os.path.exists(audio_path)}")
@@ -2189,7 +2191,7 @@ def create_project():
             # Get audio duration
             print(f"[PROJECT {project_id}] Getting audio duration...")
             audio_dur = get_audio_duration(audio_path)
-            project['audio_duration'] = audio_dur
+            PROJECTS[project_id]['audio_duration'] = audio_dur
             print(f"[PROJECT {project_id}] Audio duration: {audio_dur}s")
 
             # Transcribe
@@ -2197,21 +2199,21 @@ def create_project():
             text, confidence = transcribe_audio_file(audio_path)
             print(f"[PROJECT {project_id}] Transcription complete: {len(text)} chars, confidence: {confidence}")
 
-            project['transcription']['text'] = text
-            project['transcription']['confidence'] = confidence
-            project['transcription']['status'] = 'completed'
-            project['script'] = text
+            PROJECTS[project_id]['transcription']['text'] = text
+            PROJECTS[project_id]['transcription']['confidence'] = confidence
+            PROJECTS[project_id]['transcription']['status'] = 'completed'
+            PROJECTS[project_id]['script'] = text
 
             # Smart segment with project's image style
             print(f"[PROJECT {project_id}] Segmenting into shots...")
-            shots = smart_segment_transcript(text, audio_dur, image_style=project.get('image_style'))
-            project['shots'] = shots
+            shots = smart_segment_transcript(text, audio_dur, image_style=PROJECTS[project_id].get('image_style'))
+            PROJECTS[project_id]['shots'] = shots
             print(f"[PROJECT {project_id}] Created {len(shots)} shots")
 
             # Initialize effects
-            initialize_shot_effects(project)
+            initialize_shot_effects(PROJECTS[project_id])
 
-            project['status'] = 'created'
+            PROJECTS[project_id]['status'] = 'created'
             save_projects()
             print(f"[PROJECT {project_id}] Pipeline complete! Status: created, Shots: {len(shots)}")
 
@@ -2219,9 +2221,10 @@ def create_project():
             print(f"[PROJECT {project_id}] TRANSCRIPTION FAILED!")
             print(f"[PROJECT {project_id}] Error: {e}")
             print(f"[PROJECT {project_id}] Traceback: {traceback.format_exc()}")
-            project['transcription']['status'] = 'failed'
-            project['transcription']['error'] = str(e)
-            project['status'] = 'transcription_failed'
+            if project_id in PROJECTS:
+                PROJECTS[project_id]['transcription']['status'] = 'failed'
+                PROJECTS[project_id]['transcription']['error'] = str(e)
+                PROJECTS[project_id]['status'] = 'transcription_failed'
             save_projects()
 
     thread = threading.Thread(target=transcribe_and_segment)
