@@ -1404,6 +1404,7 @@
                                 return;
                             }
                             const project = await res.json();
+                            console.log('[DEBUG] Poll response - status:', project.status, 'shots:', project.shots?.length || 0);
                             currentProject = project;
 
                             if (project.status === 'created') {
