@@ -635,15 +635,16 @@ def initialize_shot_effects(project):
 
 # ============== IMAGE GENERATION ==============
 
-def generate_image_for_shot(project_id, shot_id, custom_prompt=None):
+def generate_image_for_shot(project_id, shot_id, custom_prompt=None, retry_count=0):
     """
     Generate an image for a shot using FLUX via Replicate.
     Updates shot state as generation progresses.
+    Retries with modified prompt on NSFW filter errors.
     """
     if not REPLICATE_API_AVAILABLE:
         raise Exception("replicate_api module not available")
 
-    print(f"[IMAGE GEN] Starting image generation for project {project_id}, shot {shot_id}")
+    print(f"[IMAGE GEN] Starting image generation for project {project_id}, shot {shot_id}" + (f" (retry {retry_count})" if retry_count > 0 else ""))
 
     # Always use PROJECTS[project_id] directly to avoid reference orphaning
     def get_shot():
@@ -663,6 +664,12 @@ def generate_image_for_shot(project_id, shot_id, custom_prompt=None):
             prompt = f"{image_style}. {base_prompt}"
         else:
             prompt = base_prompt
+
+        # On retry, add child-friendly prefix to avoid NSFW filter
+        if retry_count > 0:
+            safe_prefix = "Child-friendly, educational illustration, safe for all ages, colorful and wholesome: "
+            prompt = safe_prefix + prompt
+            print(f"[IMAGE GEN] Shot {shot_id}: Using safe-prefix prompt")
 
         # Get model from project (default: flux-schnell)
         image_model = PROJECTS[project_id].get('image_model', 'flux-schnell')
@@ -699,12 +706,23 @@ def generate_image_for_shot(project_id, shot_id, custom_prompt=None):
             return False
 
     except Exception as e:
-        print(f"[IMAGE GEN] Shot {shot_id}: ERROR - {str(e)}")
+        error_str = str(e)
+        is_rate_limited = '429' in error_str or 'Too Many Requests' in error_str
+        is_nsfw_error = 'NSFW' in error_str or 'nsfw' in error_str.lower()
+        print(f"[IMAGE GEN] Shot {shot_id}: ERROR - {error_str}")
+
+        # Retry with safe prompt prefix on NSFW errors (max 2 retries)
+        if is_nsfw_error and retry_count < 2:
+            print(f"[IMAGE GEN] Shot {shot_id}: NSFW filter triggered, retrying with safe prefix...")
+            time.sleep(2)  # Brief delay before retry
+            return generate_image_for_shot(project_id, shot_id, custom_prompt, retry_count + 1)
+
         if project_id in PROJECTS:
             get_shot()['image_status'] = 'failed'
-            get_shot()['image_error'] = str(e)
+            get_shot()['image_error'] = error_str
+            get_shot()['rate_limited'] = is_rate_limited
             save_projects()
-        return False
+        return 'rate_limited' if is_rate_limited else False
 
 
 def generate_video_from_shot_image(project_id, shot_id):
@@ -769,11 +787,13 @@ def generate_video_from_shot_image(project_id, shot_id):
             return False
 
     except Exception as e:
-        print("Error generating video: " + str(e))
+        error_str = str(e)
+        is_rate_limited = '429' in error_str or 'Too Many Requests' in error_str
+        print(f"Error generating video: {error_str}")
         shot['video_status'] = 'failed'
-        shot['video_error'] = str(e)
+        shot['video_error'] = error_str
         save_projects()
-        return False
+        return 'rate_limited' if is_rate_limited else False
 
 
 def analyze_script(script_text, audio_duration=None, image_style=None):
@@ -2568,15 +2588,30 @@ def generate_all_images(project_id):
         to_generate = [s for s in shots if s['image_status'] in ['pending', 'failed'] and not s.get('skipped')]
         print(f"[IMAGE GEN] Starting batch generation for {len(to_generate)} shots (pending + failed)")
 
-        generated = 0
+        processed = 0
+        successful = 0
         for shot in to_generate:
-            generate_image_for_shot(project_id, shot['id'])
-            generated += 1
-            # Rate limit: wait 3 seconds between requests to avoid 429 errors
-            if generated < len(to_generate):
-                time.sleep(3)
+            result = generate_image_for_shot(project_id, shot['id'])
+            processed += 1
 
-        print(f"[IMAGE GEN] Batch generation complete - {generated} shots processed")
+            if result == True:
+                successful += 1
+                # Standard delay between successful requests
+                if processed < len(to_generate):
+                    print(f"[IMAGE GEN] Waiting 5 seconds before next request...")
+                    time.sleep(5)
+            elif result == 'rate_limited':
+                # Got rate limited - wait longer before continuing
+                if processed < len(to_generate):
+                    print(f"[IMAGE GEN] Rate limited! Waiting 15 seconds before continuing...")
+                    time.sleep(15)
+            else:
+                # Other failure - still wait a bit
+                if processed < len(to_generate):
+                    print(f"[IMAGE GEN] Failed, waiting 5 seconds before next request...")
+                    time.sleep(5)
+
+        print(f"[IMAGE GEN] Batch generation complete - {successful}/{processed} shots successful")
 
     thread = threading.Thread(target=generate_all)
     thread.start()
@@ -2690,15 +2725,18 @@ def animate_all_shots(project_id):
         to_animate = [s for s in shots if s['image_status'] == 'approved' and s['status'] in ['pending', 'failed'] and not s.get('skipped')]
         print(f"[ANIMATE] Starting batch animation for {len(to_animate)} shots (pending + failed)")
 
-        animated = 0
+        processed = 0
+        successful = 0
         for shot in to_animate:
-            animate_shot_image(project_id, shot['id'])
-            animated += 1
-            # Rate limit: wait 3 seconds between requests to avoid 429 errors
-            if animated < len(to_animate):
-                time.sleep(3)
+            result = animate_shot_image(project_id, shot['id'])
+            processed += 1
+            if result:
+                successful += 1
+            # Small delay between FFmpeg processes to avoid overwhelming the system
+            if processed < len(to_animate):
+                time.sleep(0.5)
 
-        print(f"[ANIMATE] Batch animation complete - {animated} shots processed")
+        print(f"[ANIMATE] Batch animation complete - {successful}/{processed} shots successful")
 
     thread = threading.Thread(target=animate_all)
     thread.start()
