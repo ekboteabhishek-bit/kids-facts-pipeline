@@ -1658,21 +1658,46 @@ def animate_image_to_clip(image_path, output_path, duration, animation_type, ani
         raise Exception(f"FFmpeg error: {error_msg}")
 
 
+def generate_motion_prompt(animation_type, phrase=""):
+    """
+    Generate a motion prompt for WAN 2.2 I2V based on animation type.
+    Follows best practices: Motion + Camera Movement, keep it simple.
+    """
+    motion_prompts = {
+        'dolly_push': "smooth slow camera push-in, subtle gentle movement, soft cinematic lighting, steady shot",
+        'zoom_out': "gentle camera zoom out, slight ambient motion, soft lighting, smooth movement",
+        'zoom_pulse': "slow subtle zoom in, gentle pulsing motion, dreamy atmosphere, soft focus",
+        'pull_back': "smooth camera pull back, revealing shot, gentle motion, cinematic",
+        'pan_left': "slow smooth pan left, subtle environmental motion, steady movement",
+        'pan_right': "slow smooth pan right, gentle motion, cinematic lighting",
+        'static': "static shot, very subtle breathing motion, soft ambient movement, gentle lighting",
+        'ken_burns': "gentle slow zoom with subtle pan, soft motion, dreamy cinematic feel",
+    }
+
+    # Default to a gentle push-in if animation type not found
+    base_prompt = motion_prompts.get(animation_type, motion_prompts['dolly_push'])
+
+    # Add child-friendly, warm atmosphere
+    return f"{base_prompt}, warm colors, child-friendly, wholesome atmosphere"
+
+
 def animate_shot_image(project_id, shot_id):
-    """Create animated clip from approved shot image using FFmpeg zoompan."""
-    print(f"[ANIMATE] Starting animation for project {project_id}, shot {shot_id}")
+    """Create animated clip from approved shot image using WAN 2.2 I2V on Replicate."""
+    if not REPLICATE_API_AVAILABLE:
+        raise Exception("replicate_api module not available")
+
+    print(f"[ANIMATE] Starting WAN 2.2 animation for project {project_id}, shot {shot_id}")
 
     # Always use PROJECTS[project_id] directly to avoid reference orphaning
     def get_shot():
         return PROJECTS[project_id]['shots'][shot_id - 1]
 
     shot = get_shot()
-    if not shot.get('image_path'):
-        raise Exception("Shot has no image")
 
-    # Validate image file exists on disk
-    if not os.path.exists(shot['image_path']):
-        raise Exception(f"Image file not found: {shot['image_path']}")
+    # Need image URL for Replicate API
+    if not shot.get('image_url'):
+        # If we only have local path, we can't use WAN - need the URL from generation
+        raise Exception("Shot has no image URL - image must be generated first")
 
     try:
         get_shot()['status'] = 'animating'
@@ -1681,20 +1706,46 @@ def animate_shot_image(project_id, shot_id):
         clip_filename = f"{project_id}_shot_{shot_id:02d}_animated.mp4"
         clip_path = str(Path(CONFIG['paths']['clips']) / clip_filename)
 
-        animate_image_to_clip(
-            shot['image_path'],
-            clip_path,
-            shot['duration'],
-            shot['animation_type'],
-            shot['animation_params'],
-            CONFIG['video'].get('resolution', '1080x1920')
+        # Generate motion prompt based on animation type
+        motion_prompt = generate_motion_prompt(
+            shot.get('animation_type', 'dolly_push'),
+            shot.get('phrase', '')
         )
 
-        get_shot()['status'] = 'generated'
-        get_shot()['animated_clip_path'] = clip_path
-        save_projects()
-        print(f"[ANIMATE] Shot {shot_id}: Animation complete")
-        return True
+        print(f"[ANIMATE] Shot {shot_id}: Using motion prompt: {motion_prompt[:80]}...")
+
+        # Calculate num_frames based on duration (16 fps as per WAN default)
+        # WAN supports 81-121 frames, ~5-7.5 seconds at 16fps
+        duration = shot.get('duration', 2.5)
+        num_frames = min(121, max(81, int(duration * 16 * 1.5)))  # Slightly longer for trimming
+
+        print(f"[ANIMATE] Shot {shot_id}: Requesting {num_frames} frames at 720p")
+
+        # Call WAN 2.2 I2V via Replicate
+        result = replicate_api.generate_video_from_image(
+            image_url=shot['image_url'],
+            prompt=motion_prompt,
+            resolution="720p",
+            num_frames=num_frames
+        )
+
+        if result and result.get('url'):
+            video_url = result['url']
+            print(f"[ANIMATE] Shot {shot_id}: Got video URL: {video_url[:50]}...")
+
+            # Download the video
+            response = http_requests.get(video_url)
+            with open(clip_path, 'wb') as f:
+                f.write(response.content)
+
+            get_shot()['status'] = 'generated'
+            get_shot()['animated_clip_path'] = clip_path
+            get_shot()['video_url'] = video_url
+            save_projects()
+            print(f"[ANIMATE] Shot {shot_id}: Animation complete, saved to {clip_path}")
+            return True
+        else:
+            raise Exception("No video URL in WAN response")
 
     except Exception as e:
         print(f"[ANIMATE] Shot {shot_id}: ERROR - {e}")
@@ -2751,7 +2802,7 @@ def regenerate_shot_image(project_id, shot_id):
 @app.route('/api/projects/<project_id>/generate-videos-from-images', methods=['POST'])
 @app.route('/api/projects/<project_id>/animate-all', methods=['POST'])
 def animate_all_shots(project_id):
-    """Create animated clips from all approved images using FFmpeg zoompan."""
+    """Create animated clips from all approved images using WAN 2.2 I2V on Replicate."""
     if project_id not in PROJECTS:
         return jsonify({'error': 'Project not found'}), 404
 
@@ -2760,7 +2811,8 @@ def animate_all_shots(project_id):
         shots = PROJECTS[project_id]['shots']
         # Include 'failed' shots for retry
         to_animate = [s for s in shots if s['image_status'] == 'approved' and s['status'] in ['pending', 'failed'] and not s.get('skipped')]
-        print(f"[ANIMATE] Starting batch animation for {len(to_animate)} shots (pending + failed)")
+        print(f"[ANIMATE] Starting WAN 2.2 batch animation for {len(to_animate)} shots (pending + failed)")
+        print(f"[ANIMATE] Estimated cost: ${len(to_animate) * 0.11:.2f} at $0.11/video (720p)")
 
         processed = 0
         successful = 0
@@ -2769,9 +2821,10 @@ def animate_all_shots(project_id):
             processed += 1
             if result:
                 successful += 1
-            # Small delay between FFmpeg processes to avoid overwhelming the system
+            # Delay between API calls to avoid rate limiting
             if processed < len(to_animate):
-                time.sleep(0.5)
+                print(f"[ANIMATE] Waiting 3 seconds before next request...")
+                time.sleep(3)
 
         print(f"[ANIMATE] Batch animation complete - {successful}/{processed} shots successful")
 
