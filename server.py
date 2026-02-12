@@ -1607,21 +1607,28 @@ def animate_image_to_clip(image_path, output_path, duration, animation_type, ani
     pan_x_expr = f"(iw-iw/zoom)/2+{pan_x}*on/{total_frames}"
     pan_y_expr = f"(ih-ih/zoom)/2+{pan_y}*on/{total_frames}"
 
-    # Scale to exact output resolution - let zoompan work within these bounds
-    # This is more memory-efficient than pre-scaling to a larger size
+    # Memory optimization: process zoompan at half resolution, then scale up
+    # This dramatically reduces memory usage (4x less pixels to process)
+    half_w = int(int(w) // 2)
+    half_h = int(int(h) // 2)
+
+    # Scale down -> zoompan at half res -> scale back up
     filter_str = (
-        f"scale={w}:{h}:force_original_aspect_ratio=increase,"
-        f"crop={w}:{h},"
+        f"scale={half_w}:{half_h}:force_original_aspect_ratio=increase,"
+        f"crop={half_w}:{half_h},"
         f"zoompan=z='{z_expr}'"
         f":x='{pan_x_expr}'"
         f":y='{pan_y_expr}'"
         f":d={total_frames}"
-        f":s={w}x{h}"
-        f":fps={fps}"
+        f":s={half_w}x{half_h}"
+        f":fps={fps},"
+        f"scale={w}:{h}:flags=lanczos"  # Scale back up with high quality
     )
 
     cmd = [
         'ffmpeg', '-y',
+        '-nostdin',  # Don't wait for input
+        '-threads', '1',  # Limit threads to reduce memory usage
         '-loop', '1',
         '-i', image_path,
         '-vf', filter_str,
@@ -1630,11 +1637,18 @@ def animate_image_to_clip(image_path, output_path, duration, animation_type, ani
         '-crf', '23',  # Slightly higher CRF for less memory usage
         '-preset', 'fast',  # Faster preset uses less memory
         '-pix_fmt', 'yuv420p',
+        '-max_muxing_queue_size', '1024',  # Limit muxing queue
         '-an',
         output_path
     ]
 
-    subprocess.run(cmd, check=True, capture_output=True)
+    try:
+        subprocess.run(cmd, check=True, capture_output=True, timeout=120)
+    except subprocess.TimeoutExpired:
+        raise Exception(f"Animation timed out after 120 seconds")
+    except subprocess.CalledProcessError as e:
+        error_msg = e.stderr.decode() if e.stderr else str(e)
+        raise Exception(f"FFmpeg error: {error_msg[:500]}")
 
 
 def animate_shot_image(project_id, shot_id):
@@ -1648,6 +1662,10 @@ def animate_shot_image(project_id, shot_id):
     shot = get_shot()
     if not shot.get('image_path'):
         raise Exception("Shot has no image")
+
+    # Validate image file exists on disk
+    if not os.path.exists(shot['image_path']):
+        raise Exception(f"Image file not found: {shot['image_path']}")
 
     try:
         get_shot()['status'] = 'animating'
@@ -1743,7 +1761,7 @@ def concatenate_with_transitions(clip_paths, transition_durations, output_path):
         output_path
     ]
 
-    subprocess.run(cmd, check=True, capture_output=True)
+    subprocess.run(cmd, check=True, capture_output=True, timeout=300)
 
 
 def generate_clip_with_kling(prompt, project_id, shot_id):
@@ -1831,24 +1849,29 @@ def trim_clip(project_id, shot_id):
     ]
     
     try:
-        subprocess.run(cmd, check=True, capture_output=True)
+        subprocess.run(cmd, check=True, capture_output=True, timeout=120)
         shot['trimmed_path'] = trimmed_filename
     except subprocess.CalledProcessError as e:
         print(f"Error trimming clip: {e}")
+    except subprocess.TimeoutExpired:
+        print(f"Timeout trimming clip: {clip_path}")
 
 
 def apply_color_grade(input_path, output_path):
     """
     Apply consistent color grading to a clip.
     """
+    if not os.path.exists(input_path):
+        raise Exception(f"Input clip not found: {input_path}")
+
     grade = CONFIG['style']['color_grade']
-    
+
     # Build FFmpeg filter for color grading
     filter_str = (
         f"eq=brightness={grade['brightness']}:contrast={grade['contrast']}:saturation={grade['saturation']},"
         f"colorbalance=rs={grade['warmth']}:gs={grade['warmth']/2}:bs=-{grade['warmth']}"
     )
-    
+
     cmd = [
         'ffmpeg', '-y',
         '-i', input_path,
@@ -1858,8 +1881,8 @@ def apply_color_grade(input_path, output_path):
         '-preset', 'fast',
         output_path
     ]
-    
-    subprocess.run(cmd, check=True, capture_output=True)
+
+    subprocess.run(cmd, check=True, capture_output=True, timeout=120)
 
 
 def generate_effects_config(project_id, platform='tiktok'):
@@ -2098,7 +2121,7 @@ def assemble_final_video(project_id, platform='tiktok', apply_effects=True):
         '-shortest',
         str(broll_with_audio)
     ]
-    subprocess.run(cmd, check=True, capture_output=True)
+    subprocess.run(cmd, check=True, capture_output=True, timeout=120)
 
     # Step 4: Create final concat (hook + broll with audio)
     final_concat_file = temp_dir / "final_concat.txt"
@@ -2119,7 +2142,7 @@ def assemble_final_video(project_id, platform='tiktok', apply_effects=True):
         '-c:a', 'aac',
         str(final_no_captions)
     ]
-    subprocess.run(cmd, check=True, capture_output=True)
+    subprocess.run(cmd, check=True, capture_output=True, timeout=180)
 
     # Step 6: Apply Remotion effects layer (if enabled)
     if apply_effects:
@@ -2411,7 +2434,7 @@ def assemble_video(project_id):
     """Assemble final video from approved clips."""
     if project_id not in PROJECTS:
         return jsonify({'error': 'Project not found'}), 404
-    
+
     data = request.get_json() or {}
     platform = data.get('platform', PROJECTS[project_id].get('platform', 'tiktok'))
     apply_effects = data.get('apply_effects', True)
@@ -2426,16 +2449,24 @@ def assemble_video(project_id):
         'bottom': data.get('caption_bottom', 180),
     }
 
-    output_path, error = assemble_final_video(project_id, platform, apply_effects)
-    
-    if error:
-        return jsonify({'error': error}), 400
-    
-    return jsonify({
-        'success': True,
-        'output_path': output_path,
-        'has_effects': apply_effects
-    })
+    try:
+        output_path, error = assemble_final_video(project_id, platform, apply_effects)
+
+        if error:
+            return jsonify({'error': error}), 400
+
+        return jsonify({
+            'success': True,
+            'output_path': output_path,
+            'has_effects': apply_effects
+        })
+    except subprocess.CalledProcessError as e:
+        error_msg = e.stderr.decode() if e.stderr else str(e)
+        print(f"[ASSEMBLE] FFmpeg error: {error_msg}")
+        return jsonify({'error': 'Video assembly failed', 'details': error_msg}), 500
+    except Exception as e:
+        print(f"[ASSEMBLE] Error: {e}")
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/projects/<project_id>/download', methods=['GET'])
