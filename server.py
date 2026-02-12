@@ -2650,6 +2650,7 @@ def approve_shot_image(project_id, shot_id):
         return jsonify({'error': 'Shot not found'}), 404
 
     shot['image_status'] = 'approved'
+    save_projects()
 
     # Check if auto-generate video is requested
     data = request.get_json() or {}
@@ -2672,6 +2673,7 @@ def reject_shot_image(project_id, shot_id):
     for shot in PROJECTS[project_id]['shots']:
         if shot['id'] == shot_id:
             shot['image_status'] = 'rejected'
+            save_projects()
             return jsonify({'success': True})
 
     return jsonify({'error': 'Shot not found'}), 404
