@@ -1607,14 +1607,11 @@ def animate_image_to_clip(image_path, output_path, duration, animation_type, ani
     pan_x_expr = f"(iw-iw/zoom)/2+{pan_x}*on/{total_frames}"
     pan_y_expr = f"(ih-ih/zoom)/2+{pan_y}*on/{total_frames}"
 
-    # First scale the input image to be larger than output so zoompan has room to work
-    # zoompan needs the input to be at least output_size * max_zoom
-    max_zoom = max(start_zoom, end_zoom)
-    scale_w = int(int(w) * max_zoom * 1.2)
-    scale_h = int(int(h) * max_zoom * 1.2)
-
+    # Scale to exact output resolution - let zoompan work within these bounds
+    # This is more memory-efficient than pre-scaling to a larger size
     filter_str = (
-        f"scale={scale_w}:{scale_h},"
+        f"scale={w}:{h}:force_original_aspect_ratio=increase,"
+        f"crop={w}:{h},"
         f"zoompan=z='{z_expr}'"
         f":x='{pan_x_expr}'"
         f":y='{pan_y_expr}'"
@@ -1630,8 +1627,8 @@ def animate_image_to_clip(image_path, output_path, duration, animation_type, ani
         '-vf', filter_str,
         '-t', str(duration),
         '-c:v', 'libx264',
-        '-crf', '18',
-        '-preset', 'medium',
+        '-crf', '23',  # Slightly higher CRF for less memory usage
+        '-preset', 'fast',  # Faster preset uses less memory
         '-pix_fmt', 'yuv420p',
         '-an',
         output_path
