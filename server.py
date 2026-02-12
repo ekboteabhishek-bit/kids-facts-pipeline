@@ -159,16 +159,24 @@ CONFIG_PATH = Path(__file__).parent / 'config.json'
 with open(CONFIG_PATH) as f:
     CONFIG = json.load(f)
 
-# Use /var/data on Render for persistence across deploys
+# Use persistent storage on cloud platforms (Render or Railway)
 if os.environ.get('RENDER') and Path('/var/data').exists():
     PERSISTENT_DATA_DIR = Path('/var/data')
     print(f"Running on Render - using persistent storage at {PERSISTENT_DATA_DIR}")
+elif os.environ.get('RAILWAY_ENVIRONMENT'):
+    # Railway - use local directory (Railway volumes mount at custom paths)
+    PERSISTENT_DATA_DIR = Path('/app/data')
+    PERSISTENT_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    print(f"Running on Railway - using storage at {PERSISTENT_DATA_DIR}")
+else:
+    PERSISTENT_DATA_DIR = None
+
+if PERSISTENT_DATA_DIR:
     # Override config paths to use persistent storage
     for path_key in ['uploads', 'clips', 'outputs', 'temp']:
         CONFIG['paths'][path_key] = str(PERSISTENT_DATA_DIR / path_key)
     PROJECTS_DB_PATH = PERSISTENT_DATA_DIR / 'projects.json'
 else:
-    PERSISTENT_DATA_DIR = None
     PROJECTS_DB_PATH = Path(CONFIG['paths'].get('projects_db', 'projects.json'))
 
 # Ensure directories exist
@@ -193,8 +201,29 @@ def save_projects():
     except Exception as e:
         print(f"Error saving projects: {e}")
 
+def sync_projects():
+    """Reload projects from disk to sync across workers."""
+    global PROJECTS
+    disk_projects = load_projects()
+    # Merge disk projects with in-memory (in-memory takes precedence for active projects)
+    for pid, proj in disk_projects.items():
+        if pid not in PROJECTS:
+            PROJECTS[pid] = proj
+
+def fetch_project(project_id):
+    """Get a project by ID, syncing from disk if needed."""
+    if project_id not in PROJECTS:
+        sync_projects()
+    return PROJECTS.get(project_id)
+
 # Load existing projects on startup
 PROJECTS = load_projects()
+
+# Sync projects from disk on every API request (for multi-worker consistency)
+@app.before_request
+def before_request_sync():
+    if request.path.startswith('/api/projects'):
+        sync_projects()
 
 # In-memory transcription store
 TRANSCRIPTIONS = {}
@@ -2197,9 +2226,10 @@ def delete_project(project_id):
 @app.route('/api/projects/<project_id>', methods=['GET'])
 def get_project(project_id):
     """Get project details."""
-    if project_id not in PROJECTS:
+    project = fetch_project(project_id)
+    if not project:
         return jsonify({'error': 'Project not found'}), 404
-    return jsonify(PROJECTS[project_id])
+    return jsonify(project)
 
 
 @app.route('/api/projects/<project_id>/generate', methods=['POST'])
