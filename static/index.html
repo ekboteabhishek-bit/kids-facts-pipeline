@@ -1728,7 +1728,15 @@
                         return;
                     }
                     const response = await fetch(`${API_BASE}/api/projects/${currentProject.id}`);
+                    if (!response.ok) {
+                        console.error('Polling error: server returned', response.status);
+                        return;
+                    }
                     const project = await response.json();
+                    if (!project || !project.shots) {
+                        console.error('Polling error: invalid project data');
+                        return;
+                    }
                     currentProject = project;
                     renderShots();
 
