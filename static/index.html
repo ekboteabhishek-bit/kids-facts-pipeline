@@ -1383,15 +1383,26 @@
                 });
 
                 const data = await response.json();
+                console.log('[DEBUG] Create project response:', data);
 
-                if (data.success) {
+                if (data.success && data.project && data.project.id) {
                     currentProject = data.project;
+                    console.log('[DEBUG] Project created with ID:', currentProject.id);
                     setProcessingStep('transcribe');
 
                     // Poll until transcription completes
                     const poll = setInterval(async () => {
                         try {
+                            if (!currentProject || !currentProject.id) {
+                                console.error('[DEBUG] currentProject.id is undefined, stopping poll');
+                                clearInterval(poll);
+                                return;
+                            }
                             const res = await fetch(`${API_BASE}/api/projects/${currentProject.id}`);
+                            if (!res.ok) {
+                                console.error('[DEBUG] Poll failed with status:', res.status);
+                                return;
+                            }
                             const project = await res.json();
                             currentProject = project;
 
@@ -1412,15 +1423,17 @@
                                 showToast('Transcription failed: ' + (project.transcription?.error || 'Unknown error'), 'error');
                             }
                         } catch (err) {
-                            console.error('Poll error:', err);
+                            console.error('[DEBUG] Poll error:', err);
                         }
                     }, 2000);
                 } else {
                     hideProcessing();
-                    showToast(data.error || 'Failed to create project', 'error');
+                    console.error('[DEBUG] Create project failed:', data);
+                    showToast(data.error || 'Failed to create project - no project ID returned', 'error');
                 }
             } catch (error) {
                 hideProcessing();
+                console.error('[DEBUG] Create project exception:', error);
                 showToast('Error: ' + error.message, 'error');
             } finally {
                 btn.disabled = false;
@@ -1700,9 +1713,19 @@
 
         // Polling
         function startPolling() {
+            if (!currentProject || !currentProject.id) {
+                console.error('[DEBUG] startPolling called but currentProject.id is undefined');
+                return;
+            }
             if (pollInterval) clearInterval(pollInterval);
             pollInterval = setInterval(async () => {
                 try {
+                    if (!currentProject || !currentProject.id) {
+                        console.error('[DEBUG] Stopping poll - currentProject.id is undefined');
+                        clearInterval(pollInterval);
+                        pollInterval = null;
+                        return;
+                    }
                     const response = await fetch(`${API_BASE}/api/projects/${currentProject.id}`);
                     const project = await response.json();
                     currentProject = project;
