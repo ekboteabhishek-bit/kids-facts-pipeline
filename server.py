@@ -205,10 +205,9 @@ def sync_projects():
     """Reload projects from disk to sync across workers."""
     global PROJECTS
     disk_projects = load_projects()
-    # Merge disk projects with in-memory (in-memory takes precedence for active projects)
+    # Always use disk version as source of truth for multi-worker consistency
     for pid, proj in disk_projects.items():
-        if pid not in PROJECTS:
-            PROJECTS[pid] = proj
+        PROJECTS[pid] = proj
 
 def fetch_project(project_id):
     """Get a project by ID, syncing from disk if needed."""
