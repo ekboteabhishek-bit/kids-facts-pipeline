@@ -200,18 +200,15 @@ else:
 for path_key in ['uploads', 'clips', 'outputs', 'temp']:
     Path(CONFIG['paths'][path_key]).mkdir(parents=True, exist_ok=True)
 
-def load_projects():
+def load_projects(verbose=True):
     """Load projects from JSON file."""
     if PROJECTS_DB_PATH.exists():
         try:
             with open(PROJECTS_DB_PATH, 'r') as f:
                 projects = json.load(f)
-                print(f"[STORAGE] Loaded {len(projects)} projects from {PROJECTS_DB_PATH}")
                 return projects
         except Exception as e:
             print(f"[STORAGE] ERROR loading projects: {e}")
-    else:
-        print(f"[STORAGE] No projects file found at {PROJECTS_DB_PATH}")
     return {}
 
 def save_projects():
@@ -221,7 +218,6 @@ def save_projects():
         PROJECTS_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
         with open(PROJECTS_DB_PATH, 'w') as f:
             json.dump(PROJECTS, f, indent=2, default=str)
-        print(f"[STORAGE] Saved {len(PROJECTS)} projects to {PROJECTS_DB_PATH}")
     except Exception as e:
         print(f"[STORAGE] ERROR saving projects: {e}")
 
@@ -232,6 +228,7 @@ def sync_projects():
     # Always use disk version as source of truth for multi-worker consistency
     for pid, proj in disk_projects.items():
         PROJECTS[pid] = proj
+    return len(disk_projects)
 
 def fetch_project(project_id):
     """Get a project by ID, syncing from disk if needed."""
@@ -246,7 +243,7 @@ PROJECTS = load_projects()
 @app.before_request
 def before_request_sync():
     if request.path.startswith('/api/projects'):
-        sync_projects()
+        sync_projects()  # Silently sync
 
 # In-memory transcription store
 TRANSCRIPTIONS = {}
@@ -2271,7 +2268,9 @@ def get_project(project_id):
     """Get project details."""
     project = fetch_project(project_id)
     if not project:
+        print(f"[API] GET /api/projects/{project_id} - NOT FOUND")
         return jsonify({'error': 'Project not found'}), 404
+    print(f"[API] GET /api/projects/{project_id} - status: {project.get('status')}, shots: {len(project.get('shots', []))}")
     return jsonify(project)
 
 
