@@ -1647,8 +1647,15 @@ def animate_image_to_clip(image_path, output_path, duration, animation_type, ani
     except subprocess.TimeoutExpired:
         raise Exception(f"Animation timed out after 120 seconds")
     except subprocess.CalledProcessError as e:
-        error_msg = e.stderr.decode() if e.stderr else str(e)
-        raise Exception(f"FFmpeg error: {error_msg[:500]}")
+        # Get last 500 chars of stderr (actual error is at the end, not the banner)
+        stderr_text = e.stderr.decode() if e.stderr else ""
+        stdout_text = e.stdout.decode() if e.stdout else ""
+        # Extract just the error lines (skip the banner)
+        error_lines = [l for l in stderr_text.split('\n') if l.strip() and not l.startswith('  ')]
+        error_msg = '\n'.join(error_lines[-10:]) if error_lines else stderr_text[-500:]
+        if not error_msg:
+            error_msg = stdout_text[-500:] or str(e)
+        raise Exception(f"FFmpeg error: {error_msg}")
 
 
 def animate_shot_image(project_id, shot_id):
