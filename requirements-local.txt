@@ -1,0 +1,8 @@
+# Local development requirements (extends requirements.txt)
+# Install with: pip install -r requirements-local.txt
+
+-r requirements.txt
+
+# Playwright for Grok browser automation (FREE video generation)
+# After pip install, run: playwright install chromium
+playwright>=1.40.0

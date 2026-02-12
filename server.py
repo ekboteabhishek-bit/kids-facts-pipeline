@@ -66,6 +66,15 @@ except ImportError:
     fal_api = None
     FAL_API_AVAILABLE = False
 
+# Grok browser automation for free video generation
+try:
+    import grok_automation
+    GROK_AUTOMATION_AVAILABLE = True
+except ImportError:
+    grok_automation = None
+    GROK_AUTOMATION_AVAILABLE = False
+    print("Note: grok_automation not available. Install playwright for Grok integration.")
+
 # OpenAI for LLM-based prompt generation
 try:
     from openai import OpenAI
@@ -2832,6 +2841,129 @@ def animate_all_shots(project_id):
     thread.start()
 
     return jsonify({'success': True, 'message': 'Animation generation started'})
+
+
+@app.route('/api/projects/<project_id>/animate-grok', methods=['POST'])
+def animate_with_grok(project_id):
+    """
+    Create animated clips using Grok Imagine (browser automation).
+    This is FREE but requires local browser and manual login on first run.
+    Run locally only - not on Render.
+    """
+    if project_id not in PROJECTS:
+        return jsonify({'error': 'Project not found'}), 404
+
+    if not GROK_AUTOMATION_AVAILABLE:
+        return jsonify({
+            'error': 'Grok automation not available',
+            'details': 'Install playwright: pip install playwright && playwright install chromium'
+        }), 400
+
+    def animate_with_grok_batch():
+        import asyncio
+
+        shots = PROJECTS[project_id]['shots']
+        to_animate = [s for s in shots if s['image_status'] == 'approved' and s['status'] in ['pending', 'failed'] and not s.get('skipped')]
+
+        print(f"[GROK] Starting batch animation for {len(to_animate)} shots")
+        print(f"[GROK] Cost: FREE (using your Grok subscription)")
+
+        # Collect image paths and prompts
+        image_paths = []
+        prompts = []
+        shot_ids = []
+
+        for shot in to_animate:
+            if shot.get('image_path') and os.path.exists(shot['image_path']):
+                image_paths.append(shot['image_path'])
+                # Generate motion prompt
+                motion_prompt = generate_motion_prompt(
+                    shot.get('animation_type', 'dolly_push'),
+                    shot.get('phrase', '')
+                )
+                prompts.append(motion_prompt)
+                shot_ids.append(shot['id'])
+                # Mark as animating
+                shot['status'] = 'animating'
+
+        save_projects()
+
+        if not image_paths:
+            print("[GROK] No valid images to animate")
+            return
+
+        # Run the async batch process
+        output_dir = CONFIG['paths']['clips']
+
+        async def run_batch():
+            return await grok_automation.process_batch(
+                image_paths=image_paths,
+                prompts=prompts,
+                output_dir=output_dir,
+                headless=False,  # Need visible browser for first login
+                delay_between=5
+            )
+
+        try:
+            results = asyncio.run(run_batch())
+
+            # Update shot statuses
+            for i, (shot_id, result) in enumerate(zip(shot_ids, results)):
+                shot = PROJECTS[project_id]['shots'][shot_id - 1]
+                if result:
+                    shot['status'] = 'generated'
+                    shot['animated_clip_path'] = result
+                    print(f"[GROK] Shot {shot_id}: Success - {result}")
+                else:
+                    shot['status'] = 'failed'
+                    shot['error'] = 'Grok generation failed'
+                    print(f"[GROK] Shot {shot_id}: Failed")
+
+            save_projects()
+
+            successful = sum(1 for r in results if r)
+            print(f"[GROK] Batch complete - {successful}/{len(results)} successful")
+
+        except Exception as e:
+            print(f"[GROK] Batch error: {e}")
+            for shot_id in shot_ids:
+                shot = PROJECTS[project_id]['shots'][shot_id - 1]
+                shot['status'] = 'failed'
+                shot['error'] = str(e)
+            save_projects()
+
+    thread = threading.Thread(target=animate_with_grok_batch)
+    thread.start()
+
+    return jsonify({
+        'success': True,
+        'message': 'Grok animation started (browser will open)',
+        'note': 'First run requires manual login to Grok'
+    })
+
+
+@app.route('/api/animation-methods', methods=['GET'])
+def get_animation_methods():
+    """Get available animation methods and their status."""
+    return jsonify({
+        'methods': [
+            {
+                'id': 'wan',
+                'name': 'WAN 2.2 I2V (Replicate)',
+                'available': REPLICATE_API_AVAILABLE,
+                'cost': '$0.11 per video (720p)',
+                'endpoint': '/api/projects/{id}/animate-all'
+            },
+            {
+                'id': 'grok',
+                'name': 'Grok Imagine (Browser)',
+                'available': GROK_AUTOMATION_AVAILABLE,
+                'cost': 'FREE (requires Grok subscription)',
+                'endpoint': '/api/projects/{id}/animate-grok',
+                'note': 'Run locally only, requires browser'
+            }
+        ]
+    })
 
 
 # ============== EFFECTS MANAGEMENT ENDPOINTS ==============
