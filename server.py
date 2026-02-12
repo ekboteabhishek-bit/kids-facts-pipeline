@@ -2558,9 +2558,14 @@ def generate_all_images(project_id):
         pending_count = sum(1 for s in shots if s['image_status'] == 'pending' and not s.get('skipped'))
         print(f"[IMAGE GEN] Starting batch generation for {pending_count} pending shots")
 
+        generated = 0
         for shot in shots:
             if shot['image_status'] == 'pending' and not shot.get('skipped'):
                 generate_image_for_shot(project_id, shot['id'])
+                generated += 1
+                # Rate limit: wait 2 seconds between requests to avoid 429 errors
+                if generated < pending_count:
+                    time.sleep(2)
 
         print(f"[IMAGE GEN] Batch generation complete")
 
