@@ -2564,19 +2564,19 @@ def generate_all_images(project_id):
     def generate_all():
         # Always get fresh reference to avoid orphaning
         shots = PROJECTS[project_id]['shots']
-        pending_count = sum(1 for s in shots if s['image_status'] == 'pending' and not s.get('skipped'))
-        print(f"[IMAGE GEN] Starting batch generation for {pending_count} pending shots")
+        # Include 'failed' shots for retry
+        to_generate = [s for s in shots if s['image_status'] in ['pending', 'failed'] and not s.get('skipped')]
+        print(f"[IMAGE GEN] Starting batch generation for {len(to_generate)} shots (pending + failed)")
 
         generated = 0
-        for shot in shots:
-            if shot['image_status'] == 'pending' and not shot.get('skipped'):
-                generate_image_for_shot(project_id, shot['id'])
-                generated += 1
-                # Rate limit: wait 3 seconds between requests to avoid 429 errors
-                if generated < pending_count:
-                    time.sleep(3)
+        for shot in to_generate:
+            generate_image_for_shot(project_id, shot['id'])
+            generated += 1
+            # Rate limit: wait 3 seconds between requests to avoid 429 errors
+            if generated < len(to_generate):
+                time.sleep(3)
 
-        print(f"[IMAGE GEN] Batch generation complete")
+        print(f"[IMAGE GEN] Batch generation complete - {generated} shots processed")
 
     thread = threading.Thread(target=generate_all)
     thread.start()
@@ -2686,19 +2686,19 @@ def animate_all_shots(project_id):
     def animate_all():
         # Always get fresh reference to avoid orphaning
         shots = PROJECTS[project_id]['shots']
-        pending_count = sum(1 for s in shots if s['image_status'] == 'approved' and s['status'] == 'pending' and not s.get('skipped'))
-        print(f"[ANIMATE] Starting batch animation for {pending_count} shots")
+        # Include 'failed' shots for retry
+        to_animate = [s for s in shots if s['image_status'] == 'approved' and s['status'] in ['pending', 'failed'] and not s.get('skipped')]
+        print(f"[ANIMATE] Starting batch animation for {len(to_animate)} shots (pending + failed)")
 
         animated = 0
-        for shot in shots:
-            if shot['image_status'] == 'approved' and shot['status'] == 'pending' and not shot.get('skipped'):
-                animate_shot_image(project_id, shot['id'])
-                animated += 1
-                # Rate limit: wait 3 seconds between requests to avoid 429 errors
-                if animated < pending_count:
-                    time.sleep(3)
+        for shot in to_animate:
+            animate_shot_image(project_id, shot['id'])
+            animated += 1
+            # Rate limit: wait 3 seconds between requests to avoid 429 errors
+            if animated < len(to_animate):
+                time.sleep(3)
 
-        print(f"[ANIMATE] Batch animation complete")
+        print(f"[ANIMATE] Batch animation complete - {animated} shots processed")
 
     thread = threading.Thread(target=animate_all)
     thread.start()
