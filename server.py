@@ -2094,7 +2094,11 @@ def create_project():
 
     # Save uploaded files
     uploads_dir = Path(CONFIG['paths']['uploads']) / project_id
+    print(f"[PROJECT {project_id}] Creating project...")
+    print(f"[PROJECT {project_id}] PERSISTENT_DATA_DIR: {PERSISTENT_DATA_DIR}")
+    print(f"[PROJECT {project_id}] uploads_dir: {uploads_dir}")
     uploads_dir.mkdir(parents=True, exist_ok=True)
+    print(f"[PROJECT {project_id}] uploads_dir created: {uploads_dir.exists()}")
 
     hook_path = None
     audio_path = None
@@ -2103,11 +2107,13 @@ def create_project():
         hook = files['hook']
         hook_path = str(uploads_dir / secure_filename(hook.filename))
         hook.save(hook_path)
+        print(f"[PROJECT {project_id}] Saved hook to: {hook_path}, exists: {os.path.exists(hook_path)}")
 
     if 'audio' in files:
         audio = files['audio']
         audio_path = str(uploads_dir / secure_filename(audio.filename))
         audio.save(audio_path)
+        print(f"[PROJECT {project_id}] Saved audio to: {audio_path}, exists: {os.path.exists(audio_path)}, size: {os.path.getsize(audio_path) if os.path.exists(audio_path) else 0}")
 
     if not hook_path or not audio_path:
         return jsonify({'error': 'Hook video and audio file are required'}), 400
@@ -2153,31 +2159,45 @@ def create_project():
 
     # Background: transcribe audio, then smart-segment into shots
     def transcribe_and_segment():
+        import traceback
         try:
+            print(f"[PROJECT {project_id}] Starting transcription pipeline...")
+            print(f"[PROJECT {project_id}] Audio path: {audio_path}")
+            print(f"[PROJECT {project_id}] Audio file exists: {os.path.exists(audio_path)}")
+
             # Get audio duration
+            print(f"[PROJECT {project_id}] Getting audio duration...")
             audio_dur = get_audio_duration(audio_path)
             project['audio_duration'] = audio_dur
+            print(f"[PROJECT {project_id}] Audio duration: {audio_dur}s")
 
             # Transcribe
+            print(f"[PROJECT {project_id}] Starting OpenAI Whisper transcription...")
             text, confidence = transcribe_audio_file(audio_path)
+            print(f"[PROJECT {project_id}] Transcription complete: {len(text)} chars, confidence: {confidence}")
+
             project['transcription']['text'] = text
             project['transcription']['confidence'] = confidence
             project['transcription']['status'] = 'completed'
             project['script'] = text
 
             # Smart segment with project's image style
+            print(f"[PROJECT {project_id}] Segmenting into shots...")
             shots = smart_segment_transcript(text, audio_dur, image_style=project.get('image_style'))
             project['shots'] = shots
+            print(f"[PROJECT {project_id}] Created {len(shots)} shots")
 
             # Initialize effects
             initialize_shot_effects(project)
 
             project['status'] = 'created'
             save_projects()
-            print(f"Project {project_id}: transcription complete, {len(shots)} shots created")
+            print(f"[PROJECT {project_id}] Pipeline complete! Status: created, Shots: {len(shots)}")
 
         except Exception as e:
-            print(f"Project {project_id}: transcription failed: {e}")
+            print(f"[PROJECT {project_id}] TRANSCRIPTION FAILED!")
+            print(f"[PROJECT {project_id}] Error: {e}")
+            print(f"[PROJECT {project_id}] Traceback: {traceback.format_exc()}")
             project['transcription']['status'] = 'failed'
             project['transcription']['error'] = str(e)
             project['status'] = 'transcription_failed'
