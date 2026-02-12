@@ -160,24 +160,41 @@ with open(CONFIG_PATH) as f:
     CONFIG = json.load(f)
 
 # Use persistent storage on cloud platforms (Render or Railway)
+PERSISTENT_DATA_DIR = None
+
+# Check for Render
 if os.environ.get('RENDER') and Path('/var/data').exists():
     PERSISTENT_DATA_DIR = Path('/var/data')
-    print(f"Running on Render - using persistent storage at {PERSISTENT_DATA_DIR}")
+    print(f"[STORAGE] Running on Render - using {PERSISTENT_DATA_DIR}")
+
+# Check for Railway - try multiple possible volume mount paths
 elif os.environ.get('RAILWAY_ENVIRONMENT'):
-    # Railway - use local directory (Railway volumes mount at custom paths)
-    PERSISTENT_DATA_DIR = Path('/app/data')
-    PERSISTENT_DATA_DIR.mkdir(parents=True, exist_ok=True)
-    print(f"Running on Railway - using storage at {PERSISTENT_DATA_DIR}")
-else:
-    PERSISTENT_DATA_DIR = None
+    # Railway volumes can be mounted at various paths - check common ones
+    possible_paths = ['/data', '/var/data', '/app/data', '/mnt/data']
+    for vol_path in possible_paths:
+        if Path(vol_path).exists():
+            PERSISTENT_DATA_DIR = Path(vol_path)
+            print(f"[STORAGE] Railway volume found at {PERSISTENT_DATA_DIR}")
+            break
+
+    if not PERSISTENT_DATA_DIR:
+        # No volume found - create local storage (will be lost on redeploy but works for testing)
+        PERSISTENT_DATA_DIR = Path('/app/data')
+        PERSISTENT_DATA_DIR.mkdir(parents=True, exist_ok=True)
+        print(f"[STORAGE] WARNING: No Railway volume found! Using ephemeral storage at {PERSISTENT_DATA_DIR}")
+        print(f"[STORAGE] Data WILL BE LOST on redeploy. Please attach a volume in Railway dashboard.")
 
 if PERSISTENT_DATA_DIR:
+    print(f"[STORAGE] Using persistent directory: {PERSISTENT_DATA_DIR}")
     # Override config paths to use persistent storage
     for path_key in ['uploads', 'clips', 'outputs', 'temp']:
         CONFIG['paths'][path_key] = str(PERSISTENT_DATA_DIR / path_key)
+        Path(CONFIG['paths'][path_key]).mkdir(parents=True, exist_ok=True)
     PROJECTS_DB_PATH = PERSISTENT_DATA_DIR / 'projects.json'
+    print(f"[STORAGE] Projects DB path: {PROJECTS_DB_PATH}")
 else:
     PROJECTS_DB_PATH = Path(CONFIG['paths'].get('projects_db', 'projects.json'))
+    print(f"[STORAGE] Local mode - Projects DB: {PROJECTS_DB_PATH}")
 
 # Ensure directories exist
 for path_key in ['uploads', 'clips', 'outputs', 'temp']:
@@ -188,18 +205,25 @@ def load_projects():
     if PROJECTS_DB_PATH.exists():
         try:
             with open(PROJECTS_DB_PATH, 'r') as f:
-                return json.load(f)
+                projects = json.load(f)
+                print(f"[STORAGE] Loaded {len(projects)} projects from {PROJECTS_DB_PATH}")
+                return projects
         except Exception as e:
-            print(f"Error loading projects: {e}")
+            print(f"[STORAGE] ERROR loading projects: {e}")
+    else:
+        print(f"[STORAGE] No projects file found at {PROJECTS_DB_PATH}")
     return {}
 
 def save_projects():
     """Save projects to JSON file."""
     try:
+        # Ensure parent directory exists
+        PROJECTS_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
         with open(PROJECTS_DB_PATH, 'w') as f:
             json.dump(PROJECTS, f, indent=2, default=str)
+        print(f"[STORAGE] Saved {len(PROJECTS)} projects to {PROJECTS_DB_PATH}")
     except Exception as e:
-        print(f"Error saving projects: {e}")
+        print(f"[STORAGE] ERROR saving projects: {e}")
 
 def sync_projects():
     """Reload projects from disk to sync across workers."""
