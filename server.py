@@ -643,30 +643,38 @@ def generate_image_for_shot(project_id, shot_id, custom_prompt=None):
     if not REPLICATE_API_AVAILABLE:
         raise Exception("replicate_api module not available")
 
-    project = PROJECTS[project_id]
-    shot = project['shots'][shot_id - 1]
+    print(f"[IMAGE GEN] Starting image generation for project {project_id}, shot {shot_id}")
+
+    # Always use PROJECTS[project_id] directly to avoid reference orphaning
+    def get_shot():
+        return PROJECTS[project_id]['shots'][shot_id - 1]
 
     try:
-        shot['image_status'] = 'generating'
+        get_shot()['image_status'] = 'generating'
+        save_projects()
 
         # Use custom prompt or full prompt
+        shot = get_shot()
         base_prompt = custom_prompt if custom_prompt else shot['full_prompt']
 
         # Add project's image style to the prompt
-        image_style = project.get('image_style', '')
+        image_style = PROJECTS[project_id].get('image_style', '')
         if image_style:
             prompt = f"{image_style}. {base_prompt}"
         else:
             prompt = base_prompt
 
         # Get model from project (default: flux-schnell)
-        image_model = project.get('image_model', 'flux-schnell')
+        image_model = PROJECTS[project_id].get('image_model', 'flux-schnell')
+
+        print(f"[IMAGE GEN] Shot {shot_id}: Using model {image_model}")
 
         # Generate image using selected model on Replicate
         result = replicate_api.generate_image_flux(prompt, aspect_ratio="9:16", model=image_model)
 
         if result and result.get('url'):
             image_url = result['url']
+            print(f"[IMAGE GEN] Shot {shot_id}: Got image URL: {image_url[:50]}...")
 
             # Download and save image locally
             image_filename = project_id + "_shot_" + str(shot_id).zfill(2) + "_image.png"
@@ -676,20 +684,26 @@ def generate_image_for_shot(project_id, shot_id, custom_prompt=None):
             with open(image_path, 'wb') as f:
                 f.write(response.content)
 
-            shot['image_status'] = 'generated'
-            shot['image_path'] = str(image_path)
-            shot['image_url'] = image_url
+            get_shot()['image_status'] = 'generated'
+            get_shot()['image_path'] = str(image_path)
+            get_shot()['image_url'] = image_url
+            save_projects()
 
+            print(f"[IMAGE GEN] Shot {shot_id}: Image saved to {image_path}")
             return True
         else:
-            shot['image_status'] = 'failed'
-            shot['image_error'] = 'No image URL in response'
+            get_shot()['image_status'] = 'failed'
+            get_shot()['image_error'] = 'No image URL in response'
+            save_projects()
+            print(f"[IMAGE GEN] Shot {shot_id}: FAILED - No URL in response")
             return False
 
     except Exception as e:
-        print("Error generating image: " + str(e))
-        shot['image_status'] = 'failed'
-        shot['image_error'] = str(e)
+        print(f"[IMAGE GEN] Shot {shot_id}: ERROR - {str(e)}")
+        if project_id in PROJECTS:
+            get_shot()['image_status'] = 'failed'
+            get_shot()['image_error'] = str(e)
+            save_projects()
         return False
 
 
@@ -2538,12 +2552,17 @@ def generate_all_images(project_id):
     if project_id not in PROJECTS:
         return jsonify({'error': 'Project not found'}), 404
 
-    project = PROJECTS[project_id]
-
     def generate_all():
-        for shot in project['shots']:
+        # Always get fresh reference to avoid orphaning
+        shots = PROJECTS[project_id]['shots']
+        pending_count = sum(1 for s in shots if s['image_status'] == 'pending' and not s.get('skipped'))
+        print(f"[IMAGE GEN] Starting batch generation for {pending_count} pending shots")
+
+        for shot in shots:
             if shot['image_status'] == 'pending' and not shot.get('skipped'):
                 generate_image_for_shot(project_id, shot['id'])
+
+        print(f"[IMAGE GEN] Batch generation complete")
 
     thread = threading.Thread(target=generate_all)
     thread.start()
